@@ -61,6 +61,7 @@ void parser(int argc, char *argv[])
 
     for (int i = 1; i < argc; i++)
     {
+        printf("ROSSSAYSPIVOT  %c\n",argv[i][0]);
         assert(argv[i][0] == '-');
         if (argv[i][1] == 'n' && argv[i][2] == 'd' && argv[i][3] == 'l' && argv[i][4] == 'y')
             g_network_delay = atoi(&argv[i][5]);
