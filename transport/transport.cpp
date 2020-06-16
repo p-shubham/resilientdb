@@ -8,7 +8,6 @@
 
 void Transport::read_ifconfig(const char *ifaddr_file)
 {
-
     ifaddr = new char *[g_total_node_cnt];
 
     uint64_t cnt = 0;
