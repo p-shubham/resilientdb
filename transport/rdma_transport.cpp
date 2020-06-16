@@ -43,7 +43,9 @@ uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id){
     //DEBUG("Port ID:  %ld -> %ld : %ld\n", src_node_id, dest_node_id, port_id);
     return port_id;
 }
-
+/*
+*Reads if_config file in the passed address
+*/
 void Transport_rdma::read_ifconfig(const char *ifaddr_file)
 {
     ifaddr = new char *[g_total_node_cnt];
@@ -70,9 +72,9 @@ void Transport_rdma::read_ifconfig(const char *ifaddr_file)
 }
 
 /*This function creates the very first connection between the current node and the destination node
-*@params: IP: IPv4
-*@params: port: port number
-*@params: SENDER: Whether the node is going to send or recieve the first connection
+*@params: IP: IPv4 (char *)
+*@params: port: port number (uint64_t)
+*@params: SENDER: Whether the node is going to send or recieve the first connection (Boolean)
 */
 std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rdma::setup_rdma_connection(char *IP, uint64_t port, bool SENDER){
     infinity::core::Context *context = new infinity::core::Context();
@@ -136,5 +138,5 @@ void Transport_rdma::init(){
 
     string path = get_path();
     read_ifconfig(path.c_str());
-    
+
 }
