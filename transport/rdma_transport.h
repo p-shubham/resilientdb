@@ -25,8 +25,8 @@ class Transport_rdma{
         std::pair<infinity::core::Context *, infinity::queues::QueuePair *> setup_rdma_connection(uint64_t dest_node_id, uint64_t port, bool SENDER);
         int rdma_send(infinity::memory::Buffer *buf, infinity::queues::QueuePair *qp,infinity::core::Context *context);
         infinity::memory::Buffer* rdma_recv(infinity::core::Context *context);
-        bool rdma_write(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp, infinity::memory::Buffer *buf);
-        infinity::memory::Buffer * rdma_read(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp);
+        bool rdma_write(infinity::memory::Buffer *buf ,uint64_t dest_node_id, uint64_t thread_id);
+        infinity::memory::Buffer * rdma_read(uint64_t dest_node_id, uint64_t read_thread_id);
         void disconnect();
     private:
         char **ifaddr;
@@ -36,10 +36,10 @@ class Transport_rdma{
         //All the IP, Port combinations are here
         std::vector <std::pair<uint64_t,uint64_t>> IP_Ports;
         /*
-        *Following vectors are store the context,queue pair which are utilised for:
-        *1. Establishing a connection
-        *2. RDMA_Send, RDMA_recv and RDMA_write operations
+        *Following maps store the context,queue pair which are utilised for:
+        *RDMA_Send, RDMA_recv and RDMA_write operations
+        *they store: (thread_id,dest_node_id),(context,qp)
         */
-        std::vector <infinity::core::Context *, infinity::queues::QueuePair *> sender_qp;
-        std::vector <infinity::core::Context *, infinity::queues::QueuePair *> recvr_qp;
+        std::map<std::pair<uint64_t, uint64_t>, std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> context_qp;
+
 };

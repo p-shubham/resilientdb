@@ -130,7 +130,7 @@ infinity::memory::Buffer* Transport_rdma::rdma_recv(infinity::core::Context *con
     printf("Initializing recieve buffer\n");
     infinity::memory::Buffer *bufferToReceive = new infinity::memory::Buffer(context, 128 * sizeof(char));
 	context->postReceiveBuffer(bufferToReceive);
-    printf("Waiting for message (blockiing)\n");
+    printf("Waiting for message (blocking)\n");
     infinity::core::receive_element_t receiveElement;
 	while(!context->receive(&receiveElement));
     return bufferToReceive;
@@ -142,12 +142,15 @@ infinity::memory::Buffer* Transport_rdma::rdma_recv(infinity::core::Context *con
 *@params: buf: Write buffer
 *@return: bool when done
 */
-bool Transport_rdma::rdma_write(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp, infinity::memory::Buffer *buf){
+bool Transport_rdma::rdma_write(infinity::memory::Buffer *buf ,uint64_t dest_node_id, uint64_t thread_id){
+    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> pair = context_qp.find(make_pair(dest_node_id,thread_id))->second;
+    infinity::core::Context *context = pair.first;
+    infinity::queues::QueuePair *remote_qp = pair.second;
     infinity::requests::RequestToken request_token(context);
     infinity::memory::RegionToken *rmt_buf_token = (infinity::memory::RegionToken *) remote_qp->getUserData();
     remote_qp->write(buf, rmt_buf_token, &request_token);
     request_token.waitUntilCompleted();
-    return true
+    return true;
 }
 /*
 *@function: rdma_read()
@@ -155,7 +158,10 @@ bool Transport_rdma::rdma_write(infinity::core::Context *context, infinity::queu
 *@params: context
 *@return: buffer when done
 */
-infinity::memory::Buffer* Transport_rdma::rdma_read(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp){
+infinity::memory::Buffer* Transport_rdma::rdma_read(uint64_t dest_node_id, uint64_t read_thread_id){
+    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> pair = context_qp.find(make_pair(dest_node_id,read_thread_id))->second;
+    infinity::core::Context *context = pair.first;
+    infinity::queues::QueuePair *remote_qp = pair.second;
     infinity::requests::RequestToken request_token(context);
     infinity::memory::RegionToken *rmt_buf_token = (infinity::memory::RegionToken *) remote_qp->getUserData();
     infinity::memory::Buffer *read_buf = new infinity::memory::Buffer(context, 128 * sizeof(char));
@@ -172,7 +178,8 @@ void Transport_rdma::init(){
     read_ifconfig(path.c_str());
     /*
     *TO DO:
-    *1. Connect to all the IPs and Ports and push the (pair(thread_id, dest_node_id),pair(context,qp)) to send_vector
-    *2. Bind to ports and recieve all the first messages from the nodes, save the 
+    *1. Connect to all the IPs and Ports and push the (pair(thread_id, dest_node_id),pair(context,qp)) to context_qp map
+    *2. Bind to ports and recieve all the first messages from the nodes
     */
+    
 }
