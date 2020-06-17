@@ -34,13 +34,24 @@ string Transport_rdma::get_path(){
         return path;
 }
 
-
-//Get the port number of the particular replica
-uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id){
-    uint64_t port_id = 17000;
+/*
+*For every send_thread in the replica,
+*
+*/
+uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id, uint64_t send_thread_id){
+    uint64_t port_id = 0;
+    DEBUG("Calc port id %ld %ld %ld\n", src_node_id, dest_node_id, send_thread_id);
     port_id += g_total_node_cnt * dest_node_id;
+    DEBUG("%ld\n", port_id);
     port_id += src_node_id;
-    //DEBUG("Port ID:  %ld -> %ld : %ld\n", src_node_id, dest_node_id, port_id);
+    DEBUG("%ld\n", port_id);
+    //  uint64_t max_send_thread_cnt = g_send_thread_cnt > g_client_send_thread_cnt ? g_send_thread_cnt : g_client_send_thread_cnt;
+    //  port_id *= max_send_thread_cnt;
+    port_id += send_thread_id * g_total_node_cnt * g_total_node_cnt;
+    DEBUG("%ld\n", port_id);
+    port_id += TPORT_PORT;
+    DEBUG("%ld\n", port_id);
+    printf("Port ID:  %ld, %ld -> %ld : %ld\n", send_thread_id, src_node_id, dest_node_id, port_id);
     return port_id;
 }
 /*
@@ -62,31 +73,25 @@ void Transport_rdma::read_ifconfig(const char *ifaddr_file)
         cnt++;
     }
     assert(cnt == g_total_node_cnt);
-    for(int node_id=0;node_id<g_total_node_cnt;node_id++){
-        char *IP = ifaddr[node_id];
-        if(node_id == g_node_id)
-            continue;
-        uint64_t port = get_port_id(node_id,g_node_id);
-        IP_Ports.push_back(make_pair(IP,port));
-    }
 }
 
 /*This function creates the very first connection between the current node and the destination node
-*@params: IP: IPv4 (char *)
+*@params: dest_node_id:  destination node id (uint64_t)
 *@params: port: port number (uint64_t)
 *@params: SENDER: Whether the node is going to send or recieve the first connection (Boolean)
 */
-std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rdma::setup_rdma_connection(char *IP, uint64_t port, bool SENDER){
+std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rdma::setup_rdma_connection(uint64_t dest_node_id, uint64_t port, bool SENDER){
     infinity::core::Context *context = new infinity::core::Context();
     infinity::queues::QueuePairFactory *qpFactory = new infinity::queues::QueuePairFactory(context);
 	infinity::queues::QueuePair *qp;
     if(SENDER){
+        char* IP = ifaddr[dest_node_id];
         qp = qpFactory->connectToRemoteHost(IP, port);
-        printf("Sending first RDMA message\n");
+        printf("Sending first RDMA message to %ld \n", dest_node_id);
         infinity::memory::Buffer *sendBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
-        infinity::memory::Buffer *receiveBuffer = new infinity::memory::Buffer(context, sizeof(char));
+        infinity::memory::Buffer *receiveBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
         context->postReceiveBuffer(receiveBuffer);
-        qp->send(sendBuffer, sizeof(char), context->defaultRequestToken);
+        qp->send(sendBuffer, 128 * sizeof(char), context->defaultRequestToken);
         context->defaultRequestToken->waitUntilCompleted();
         printf("Sent first RDMA message\n");
         return make_pair(context,qp);
@@ -97,7 +102,7 @@ std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rd
         printf("Setting up connection (blocking)\n");
 		qpFactory->bindToPort(port);
 		qp = qpFactory->acceptIncomingConnection(bufferToken, sizeof(infinity::memory::RegionToken));
-        printf("Recieved initial message\n");
+        printf("Recieved initial message from %ld \n", dest_node_id);
         return make_pair(context,qp);
     }
 }
@@ -130,7 +135,18 @@ infinity::memory::Buffer* Transport_rdma::rdma_recv(infinity::core::Context *con
 	while(!context->receive(&receiveElement));
     return bufferToReceive;
 }
-
+/*
+*@function: rdma_write()
+*@params:  
+*@params: 
+*/
+void Transport_rdma::rdma_write(){}
+/*
+*@function: rdma_read()
+*@params:  
+*@params: 
+*/
+void Transport_rdma::rdma_read(){}
 /*
 *Following function initailizes the transport manager in the replica or client
 */
@@ -138,5 +154,9 @@ void Transport_rdma::init(){
 
     string path = get_path();
     read_ifconfig(path.c_str());
-
+    /*
+    *TO DO:
+    *1. Connect to all the IPs and Ports and push the pair(thread_id, dest_node_id),pair(context,qp)) to send_vector
+    *2. Bind to ports and recieve all the first messages from the nodes, save the 
+    */
 }
