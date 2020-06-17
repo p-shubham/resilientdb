@@ -25,8 +25,8 @@ class Transport_rdma{
         std::pair<infinity::core::Context *, infinity::queues::QueuePair *> setup_rdma_connection(uint64_t dest_node_id, uint64_t port, bool SENDER);
         int rdma_send(infinity::memory::Buffer *buf, infinity::queues::QueuePair *qp,infinity::core::Context *context);
         infinity::memory::Buffer* rdma_recv(infinity::core::Context *context);
-        void rdma_write();
-        void rdma_read();
+        bool rdma_write(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp, infinity::memory::Buffer *buf);
+        infinity::memory::Buffer * rdma_read(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp);
         void disconnect();
     private:
         char **ifaddr;

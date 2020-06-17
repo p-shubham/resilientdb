@@ -137,16 +137,32 @@ infinity::memory::Buffer* Transport_rdma::rdma_recv(infinity::core::Context *con
 }
 /*
 *@function: rdma_write()
-*@params:  
-*@params: 
+*@params: remote_qp = qpFactory->connectToRemoteHost(IP,port)
+*@params: context
+*@params: buf: Write buffer
+*@return: bool when done
 */
-void Transport_rdma::rdma_write(){}
+bool Transport_rdma::rdma_write(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp, infinity::memory::Buffer *buf){
+    infinity::requests::RequestToken request_token(context);
+    infinity::memory::RegionToken *rmt_buf_token = (infinity::memory::RegionToken *) remote_qp->getUserData();
+    remote_qp->write(buf, rmt_buf_token, &request_token);
+    request_token.waitUntilCompleted();
+    return true
+}
 /*
 *@function: rdma_read()
-*@params:  
-*@params: 
+*@params: remote_qp = qpFactory->connectToRemoteHost(IP,port)
+*@params: context
+*@return: buffer when done
 */
-void Transport_rdma::rdma_read(){}
+infinity::memory::Buffer* Transport_rdma::rdma_read(infinity::core::Context *context, infinity::queues::QueuePair *remote_qp){
+    infinity::requests::RequestToken request_token(context);
+    infinity::memory::RegionToken *rmt_buf_token = (infinity::memory::RegionToken *) remote_qp->getUserData();
+    infinity::memory::Buffer *read_buf = new infinity::memory::Buffer(context, 128 * sizeof(char));
+    remote_qp->read(read_buf, rmt_buf_token, &request_token);
+    request_token.waitUntilCompleted();
+    return read_buf;
+}
 /*
 *Following function initailizes the transport manager in the replica or client
 */
@@ -156,7 +172,7 @@ void Transport_rdma::init(){
     read_ifconfig(path.c_str());
     /*
     *TO DO:
-    *1. Connect to all the IPs and Ports and push the pair(thread_id, dest_node_id),pair(context,qp)) to send_vector
+    *1. Connect to all the IPs and Ports and push the (pair(thread_id, dest_node_id),pair(context,qp)) to send_vector
     *2. Bind to ports and recieve all the first messages from the nodes, save the 
     */
 }
