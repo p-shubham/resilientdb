@@ -5,16 +5,21 @@ NNMSG=deps/nanomsg-1.1.4
 BOOST=deps/boost_1_67_0
 CRYPTOPP=deps/crypto
 SQLITE=deps/sqlite-autoconf-3290000/build
+INFINITY=deps/INFINITY/release
 
 .SUFFIXES: .o .cpp .h
 
 SRC_DIRS = ./ ./benchmarks/ ./client/ ./transport/ ./system/ ./statistics/ ./blockchain/ ./db/ ./smart_contracts/
 DEPS = -I. -I./benchmarks -I./client/ -I./transport -I./system -I./statistics -I./blockchain -I./smart_contracts -I$(JEMALLOC)/include -I$(NNMSG)/include -I$(BOOST) -I$(CRYPTOPP) -I./db -I$(SQLITE)/include
 
+#RDMA DEPS and FLAGS
+# RDMA_DEPS = -I. -I$(INFINITY)/include -L$(INFINITY)
+# RDMA_LD_FLAGS = -linfinity -libverbs
+
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Werror -Wno-sizeof-pointer-memaccess
 LDFLAGS = -Wall -L. -L$(NNMSG)/lib -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++0x -L$(CRYPTOPP) -L$(SQLITE)/lib
 LDFLAGS += $(CFLAGS)
-LIBS = -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -ldl
+LIBS = -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -ldl 
 
 DB_MAINS = ./client/client_main.cpp  ./unit_tests/unit_main.cpp
 CL_MAINS = ./system/main.cpp ./unit_tests/unit_main.cpp
@@ -43,6 +48,8 @@ deps:$(CPPS_DB)
 
 rundb : $(OBJS_DB)
 	$(CC) -static -o $@ $^ $(LDFLAGS) $(LIBS)
+# ./obj/%.o: transport/%.cpp
+# 	$(CC) -static -c $(CFLAGS) $(RDMA_LD_FLAGS) $(RDMA_DEPS) $(INCLUDE) $(LIBS) -o $@ $<
 ./obj/%.o: transport/%.cpp
 	$(CC) -static -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
 ./obj/%.o: benchmarks/%.cpp
