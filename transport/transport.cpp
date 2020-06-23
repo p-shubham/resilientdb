@@ -201,7 +201,7 @@ void Transport::init()
                 // Sockets for clients and servers in different sets.
                 if (!ISSERVER)
                 {
-                    recv_.push_back(sock);
+                    recv_sockets.push_back(sock);
                 }
                 else
                 {

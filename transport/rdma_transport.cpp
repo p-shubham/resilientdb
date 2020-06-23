@@ -127,14 +127,13 @@ int Transport_rdma::rdma_send(infinity::memory::Buffer *buf,uint64_t dest_node_i
 /*
 *TO DO: NOT COMPLETE, WONT WORK
 *This function recieves the message on the current node
-*@params: context: the context of the sender node
-*@params: qp: QP
+*@params: thread_id which will recieve message
 *@returns: Buffer: returns pointer the message recieved
 */
 infinity::memory::Buffer* Transport_rdma::rdma_recv(uint64_t thread_id){
     infinity::core::Context *context;
     printf("Initializing recieve buffer\n");
-    infinity::memory::Buffer *bufferToReceive = new infinity::memory::Buffer(context, ((size_t) -1));
+    infinity::memory::Buffer *bufferToReceive = new infinity::memory::Buffer(context, 128 * sizeof(char));
 	context->postReceiveBuffer(bufferToReceive);
     printf("Waiting for message (blocking)\n");
     infinity::core::receive_element_t receiveElement;

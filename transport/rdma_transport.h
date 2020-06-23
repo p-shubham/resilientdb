@@ -4,8 +4,8 @@
 #include <nanomsg/pair.h>
 #include "query.h"
 
-#include <infinity/core/Context.h>
-#include <infinity/queues/QueuePairFactory.h>
+#include "infinity/core/Context.h"
+#include "infinity/queues/QueuePairFactory.h"
 #include <infinity/queues/QueuePair.h>
 #include <infinity/memory/Buffer.h>
 #include <infinity/memory/RegionToken.h>
