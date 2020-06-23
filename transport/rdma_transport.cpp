@@ -177,6 +177,7 @@ infinity::memory::Buffer* Transport_rdma::rdma_read(uint64_t dest_node_id, uint6
 }
 /*
 *Following function initailizes the transport manager in the replica or client
+*TO DO: Modify structure of recv_ and others.
 */
 void Transport_rdma::init(){
 
@@ -196,11 +197,13 @@ void Transport_rdma::init(){
             {
                 uint64_t port_id = get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
                 if (!ISSERVER)
-                {
+                {   
+                    //structure should be: pair<thread_id, pair<context,qp>>
                     recv_.push_back(setup_rdma_connection(node_id,port_id,false));
                 }
                 else
                 {
+                    //structure should be: pair<thread_id, pair<context,qp>>
                     recv_clients.push_back(setup_rdma_connection(node_id,port_id,false));
                 }
                 //DEBUG("Socket insert: {%ld}: %ld\n", node_id, (uint64_t)sock);
@@ -212,16 +215,19 @@ void Transport_rdma::init(){
                 uint64_t port_id = get_port_id(node_id, g_node_id, server_thread_id % g_send_thread_cnt);
                 if (!ISSERVER)
                 {
+                    //structure should be: pair<thread_id, pair<context,qp>>
                     recv_.push_back(setup_rdma_connection(node_id,port_id,false));
                 }
                 else
                 {
                     if (node_id % (g_this_rem_thread_cnt - 1) == 0)
                     {
+                        //structure should be: pair<thread_id, pair<context,qp>>
                         recv_replicas_1.push_back(setup_rdma_connection(node_id,port_id,false));
                     }
                     else
                     {
+                        //structure should be: pair<thread_id, pair<context,qp>>
                         recv_replicas_2.push_back(setup_rdma_connection(node_id,port_id,false));
                     }
                 }
