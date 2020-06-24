@@ -23,10 +23,11 @@ class Transport_rdma{
         string get_path(); 
         void read_ifconfig(const char *ifaddr_file);
         std::pair<infinity::core::Context *, infinity::queues::QueuePair *> setup_rdma_connection(uint64_t dest_node_id, uint64_t port, bool SENDER);
-        int rdma_send(infinity::memory::Buffer *,uint64_t dest_node_id, uint64_t thread_id);
+        int send_msg(uint64_t dest_node_id, uint64_t thread_id, void *sbuf, int size);
         infinity::memory::Buffer* rdma_recv(uint64_t);
         bool rdma_write(void *buf ,uint64_t dest_node_id, uint64_t thread_id);
         infinity::memory::Buffer * rdma_read(uint64_t dest_node_id, uint64_t read_thread_id);
+        std::vector<Message *> *recv_msg(uint64_t thd_id);
         void disconnect();
     private:
         char **ifaddr;
@@ -43,10 +44,10 @@ class Transport_rdma{
         //Send Map- <<node_id,thread_id>,<context,qp>>
         std::map<std::pair<uint64_t, uint64_t>, std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> send_pairs;
         //Recieve Vector to be used by clients
-        std::vector<std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_;
+        std::map<uint64_t,std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_;
         
         //Recieve Vector to be used by replicas
-        std::vector<std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_clients;
-        std::vector<std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_replicas_1;
-        std::vector<std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_replicas_2;
+        std::map<uint64_t,std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_clients;
+        std::map<uint64_t,std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_replicas_1;
+        std::map<uint64_t,std::pair<infinity::core::Context *, infinity::queues::QueuePair *>> recv_replicas_2;
 };

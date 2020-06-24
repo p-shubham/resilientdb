@@ -114,23 +114,29 @@ std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rd
 *@params: Context: Context of the sender to be used to send the message
 *@returns: 1 if completed
 */
-int Transport_rdma::rdma_send(infinity::memory::Buffer *buf,uint64_t dest_node_id, uint64_t thread_id){
+int Transport_rdma::send_msg(uint64_t dest_node_id, uint64_t thread_id, void *sbuf, int size){
     std::pair<infinity::core::Context *, infinity::queues::QueuePair *> pair = send_pairs.find(make_pair(dest_node_id,thread_id))->second;
     infinity::core::Context *context = pair.first;
     infinity::queues::QueuePair *qp = pair.second;
-    uint64_t size = buf->getSizeInBytes();
+
+    infinity::memory::Buffer *buf = new infinity::memory::Buffer(context, sbuf, size);
     printf("Sending the message\n");
     infinity::requests::RequestToken requestToken(context);
+
     qp->send(buf, size , &requestToken);
+	requestToken.waitUntilCompleted();
+
     return 1;
 }
 /*
-*TO DO: NOT COMPLETE, WONT WORK
 *This function recieves the message on the current node
 *@params: thread_id which will recieve message
 *@returns: Buffer: returns pointer the message recieved
 */
-infinity::memory::Buffer* Transport_rdma::rdma_recv(uint64_t thread_id){
+std::vector<Message *> * Transport_rdma::recv_msg(uint64_t thread_id){
+    void *buf;
+    std::vector<Message *> *msgs = NULL;
+    //TO DO:figure out a way to get the contexts
     infinity::core::Context *context;
     printf("Initializing recieve buffer\n");
     infinity::memory::Buffer *bufferToReceive = new infinity::memory::Buffer(context, 128 * sizeof(char));
@@ -139,7 +145,9 @@ infinity::memory::Buffer* Transport_rdma::rdma_recv(uint64_t thread_id){
     infinity::core::receive_element_t receiveElement;
 	while (!context->receive(&receiveElement));
 	context->postReceiveBuffer(receiveElement.buffer);
-    return bufferToReceive;
+    buf = bufferToReceive->getData();
+    msgs = Message::create_messages((char *)buf);
+    return msgs;
 }
 /*
 *@function: rdma_write()
@@ -177,7 +185,6 @@ infinity::memory::Buffer* Transport_rdma::rdma_read(uint64_t dest_node_id, uint6
 }
 /*
 *Following function initailizes the transport manager in the replica or client
-*TO DO: Modify structure of recv_ and others.
 */
 void Transport_rdma::init(){
 
@@ -191,22 +198,20 @@ void Transport_rdma::init(){
         if(node_id == g_node_id){
             continue;
         }
-        //Configuring the recieving contexts and Queue Pairs
         if(ISCLIENTN(node_id)){
             for (uint64_t client_thread_id = g_client_thread_cnt + g_client_rem_thread_cnt; client_thread_id < g_client_thread_cnt + g_client_rem_thread_cnt + g_client_send_thread_cnt; client_thread_id++)
             {
                 uint64_t port_id = get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
                 if (!ISSERVER)
                 {   
-                    //structure should be: pair<thread_id, pair<context,qp>>
-                    recv_.push_back(setup_rdma_connection(node_id,port_id,false));
+                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
+                    recv_.insert(make_pair(client_thread_id, recvr));
                 }
                 else
                 {
-                    //structure should be: pair<thread_id, pair<context,qp>>
-                    recv_clients.push_back(setup_rdma_connection(node_id,port_id,false));
+                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
+                    recv_clients.insert(make_pair(client_thread_id, recvr));
                 }
-                //DEBUG("Socket insert: {%ld}: %ld\n", node_id, (uint64_t)sock);
             }
         }
         else{
@@ -215,23 +220,22 @@ void Transport_rdma::init(){
                 uint64_t port_id = get_port_id(node_id, g_node_id, server_thread_id % g_send_thread_cnt);
                 if (!ISSERVER)
                 {
-                    //structure should be: pair<thread_id, pair<context,qp>>
-                    recv_.push_back(setup_rdma_connection(node_id,port_id,false));
+                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
+                    recv_.insert(make_pair(server_thread_id, recvr));
                 }
                 else
                 {
                     if (node_id % (g_this_rem_thread_cnt - 1) == 0)
                     {
-                        //structure should be: pair<thread_id, pair<context,qp>>
-                        recv_replicas_1.push_back(setup_rdma_connection(node_id,port_id,false));
+                        std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
+                        recv_replicas_1.insert(make_pair(server_thread_id,recvr));
                     }
                     else
                     {
-                        //structure should be: pair<thread_id, pair<context,qp>>
-                        recv_replicas_2.push_back(setup_rdma_connection(node_id,port_id,false));
+                        std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
+                        recv_replicas_2.insert(make_pair(server_thread_id,recvr));
                     }
                 }
-                //DEBUG("Socket insert: {%ld}: %ld\n", node_id, (uint64_t)sock);
             }
         }
         //Configuring Send Maps

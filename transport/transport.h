@@ -44,10 +44,8 @@ private:
 	uint64_t rr;
 	std::map<std::pair<uint64_t, uint64_t>, Socket *> send_sockets; // dest_node_id,send_thread_id : socket
 
-	// To be used by clients.
 	std::vector<Socket *> recv_sockets;
 
-	// To be used replicas.
 	std::vector<Socket *> recv_sockets_clients;
 	std::vector<Socket *> recv_sockets_servers1;
 	std::vector<Socket *> recv_sockets_servers2;
