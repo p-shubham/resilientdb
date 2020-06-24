@@ -80,31 +80,33 @@ void Transport_rdma::read_ifconfig(const char *ifaddr_file)
 *@params: port: port number (uint64_t)
 *@params: SENDER: Whether the node is going to send or recieve the first connection (Boolean)
 */
-std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rdma::setup_rdma_connection(uint64_t dest_node_id, uint64_t port, bool SENDER){
+std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rdma::setup_rdma_connection(uint64_t dest_node_id, uint64_t port){
     infinity::core::Context *context = new infinity::core::Context();
     infinity::queues::QueuePairFactory *qpFactory = new infinity::queues::QueuePairFactory(context);
 	infinity::queues::QueuePair *qp;
-    if(SENDER){
-        char* IP = ifaddr[dest_node_id];
-        qp = qpFactory->connectToRemoteHost(IP, port);
-        printf("Sending first RDMA message to %ld \n", dest_node_id);
-        infinity::memory::Buffer *sendBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
-        infinity::memory::Buffer *receiveBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
-        context->postReceiveBuffer(receiveBuffer);
-        qp->send(sendBuffer, 128 * sizeof(char), context->defaultRequestToken);
-        context->defaultRequestToken->waitUntilCompleted();
-        printf("Sent first RDMA message\n");
-        return make_pair(context,qp);
-    }
-    else{
-        infinity::memory::Buffer *bufferToReadWrite = new infinity::memory::Buffer(context, 128 * sizeof(char));
-		infinity::memory::RegionToken *bufferToken = bufferToReadWrite->createRegionToken();
-        printf("Setting up connection (blocking)\n");
-		qpFactory->bindToPort(port);
-		qp = qpFactory->acceptIncomingConnection(bufferToken, sizeof(infinity::memory::RegionToken));
-        printf("Recieved first message from %ld \n", dest_node_id);
-        return make_pair(context,qp);
-    }
+    char* IP = ifaddr[dest_node_id];
+    qp = qpFactory->connectToRemoteHost(IP, port);
+    printf("Sending first RDMA message to %ld \n", dest_node_id);
+    infinity::memory::Buffer *sendBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
+    infinity::memory::Buffer *receiveBuffer = new infinity::memory::Buffer(context, 128 * sizeof(char));
+    context->postReceiveBuffer(receiveBuffer);
+    qp->send(sendBuffer, 128 * sizeof(char), context->defaultRequestToken);
+    context->defaultRequestToken->waitUntilCompleted();
+    printf("Sent first RDMA message\n");
+    return make_pair(context,qp);
+}
+
+infinity::core::Context * Transport_rdma::setup_rdma_connection(uint64_t port){
+    infinity::core::Context *context = new infinity::core::Context();
+    infinity::queues::QueuePairFactory *qpFactory = new infinity::queues::QueuePairFactory(context);
+    infinity::queues::QueuePair *qp;
+    infinity::memory::Buffer *buffertorecieve = new infinity::memory::Buffer(context, 128 * sizeof(char));
+    infinity::memory::RegionToken *bufferToken = buffertorecieve->createRegionToken();
+    printf("Setting up connection (blocking)\n");
+    qpFactory->bindToPort(port);
+    qp = qpFactory->acceptIncomingConnection(bufferToken, sizeof(infinity::memory::RegionToken));
+    printf("Recieved first message");
+    return context;
 }
 
 /*
@@ -114,7 +116,7 @@ std::pair<infinity::core::Context *, infinity::queues::QueuePair *> Transport_rd
 *@params: Context: Context of the sender to be used to send the message
 *@returns: 1 if completed
 */
-int Transport_rdma::send_msg(uint64_t dest_node_id, uint64_t thread_id, void *sbuf, int size){
+void Transport_rdma::send_msg(uint64_t dest_node_id, uint64_t thread_id, void *sbuf, int size){
     std::pair<infinity::core::Context *, infinity::queues::QueuePair *> pair = send_pairs.find(make_pair(dest_node_id,thread_id))->second;
     infinity::core::Context *context = pair.first;
     infinity::queues::QueuePair *qp = pair.second;
@@ -126,17 +128,17 @@ int Transport_rdma::send_msg(uint64_t dest_node_id, uint64_t thread_id, void *sb
     qp->send(buf, size , &requestToken);
 	requestToken.waitUntilCompleted();
 
-    return 1;
+    INC_STATS(send_thread_id, msg_send_time, get_sys_clock() - starttime);
+    INC_STATS(send_thread_id, msg_send_cnt, 1);
 }
 /*
 *This function recieves the message on the current node
 *@params: thread_id which will recieve message
-*@returns: Buffer: returns pointer the message recieved
+*@returns: a vector of messages
 */
 std::vector<Message *> * Transport_rdma::recv_msg(uint64_t thread_id){
     void *buf;
     std::vector<Message *> *msgs = NULL;
-    //TO DO:figure out a way to get the contexts
     infinity::core::Context *context;
     printf("Initializing recieve buffer\n");
     infinity::memory::Buffer *bufferToReceive = new infinity::memory::Buffer(context, 128 * sizeof(char));
@@ -204,13 +206,13 @@ void Transport_rdma::init(){
                 uint64_t port_id = get_port_id(node_id, g_node_id, client_thread_id % g_client_send_thread_cnt);
                 if (!ISSERVER)
                 {   
-                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
-                    recv_.insert(make_pair(client_thread_id, recvr));
+                    infinity::core::Context* recvr = setup_rdma_connection(port_id);
+                    recv_.push_back(recvr);
                 }
                 else
                 {
-                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
-                    recv_clients.insert(make_pair(client_thread_id, recvr));
+                    infinity::core::Context* recvr = setup_rdma_connection(port_id);
+                    recv_clients.push_back(recvr);
                 }
             }
         }
@@ -220,20 +222,20 @@ void Transport_rdma::init(){
                 uint64_t port_id = get_port_id(node_id, g_node_id, server_thread_id % g_send_thread_cnt);
                 if (!ISSERVER)
                 {
-                    std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
-                    recv_.insert(make_pair(server_thread_id, recvr));
+                    infinity::core::Context* recvr = setup_rdma_connection(port_id);
+                    recv_.push_back(recvr);
                 }
                 else
                 {
                     if (node_id % (g_this_rem_thread_cnt - 1) == 0)
                     {
-                        std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
-                        recv_replicas_1.insert(make_pair(server_thread_id,recvr));
+                        infinity::core::Context* recvr = setup_rdma_connection(port_id);
+                        recv_replicas_1.push_back(recvr);
                     }
                     else
                     {
-                        std::pair<infinity::core::Context *, infinity::queues::QueuePair *> recvr = setup_rdma_connection(node_id,port_id,false);
-                        recv_replicas_2.insert(make_pair(server_thread_id,recvr));
+                        infinity::core::Context* recvr = setup_rdma_connection(port_id);
+                        recv_replicas_2.push_back(recvr);
                     }
                 }
             }
@@ -245,7 +247,7 @@ void Transport_rdma::init(){
             {
                 uint64_t port_id = get_port_id(g_node_id, node_id, client_thread_id % g_client_send_thread_cnt);
                 std::pair<uint64_t, uint64_t> sender = std::make_pair(node_id, client_thread_id);
-                std::pair<infinity::core::Context *, infinity::queues::QueuePair *> temp = setup_rdma_connection(node_id,port_id,true);
+                std::pair<infinity::core::Context *, infinity::queues::QueuePair *> temp = setup_rdma_connection(node_id,port_id);
                 send_pairs.insert(std::make_pair(sender, temp));
                 //DEBUG("Socket insert: {%ld,%ld}: %ld\n", node_id, client_thread_id, (uint64_t)sock);
             }
@@ -256,7 +258,7 @@ void Transport_rdma::init(){
             {
                 uint64_t port_id = get_port_id(g_node_id, node_id, server_thread_id % g_send_thread_cnt);
                 std::pair<uint64_t, uint64_t> sender = std::make_pair(node_id, server_thread_id);
-                std::pair<infinity::core::Context *, infinity::queues::QueuePair *> temp = setup_rdma_connection(node_id,port_id,true);
+                std::pair<infinity::core::Context *, infinity::queues::QueuePair *> temp = setup_rdma_connection(node_id,port_id);
                 send_pairs.insert(std::make_pair(sender, temp));
                 //DEBUG("Socket insert: {%ld,%ld}: %ld\n", node_id, server_thread_id, (uint64_t)sock);
             }
