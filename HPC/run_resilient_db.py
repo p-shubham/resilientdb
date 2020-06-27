@@ -15,7 +15,7 @@ def __main__(cpu,replica=4,client=1):
     for y in range(replica,replica+client - 1):
         command += 'sbatch c' + str(y-replica) + '.sh && '
         num += 1
-    command += 'sbatch c' + str(num+1) + '.sh'
+    command += 'sbatch c' + str(num) + '.sh'
     #print(command)
     stream = os.popen(command)
     stream = stream.read()
