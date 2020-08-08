@@ -1,22 +1,21 @@
 CC=g++
-CFLAGS=-Wall -g -gdwarf-3 -std=c++0x -rdynamic -linfinity -libverbs#
+CFLAGS=-Wall -g -gdwarf-3 -std=c++0x -rdynamic -libverbs -lnanomsg#
 JEMALLOC=deps/jemalloc-5.1.0
 NNMSG=deps/nanomsg-1.1.4
 BOOST=deps/boost_1_67_0
 CRYPTOPP=deps/crypto
 SQLITE=deps/sqlite-autoconf-3290000/build
-INFINITY=deps/infinity
 
 .SUFFIXES: .o .cpp .h
 
 SRC_DIRS = ./ ./benchmarks/ ./client/ ./transport/ ./system/ ./statistics/ ./blockchain/ ./db/ ./smart_contracts/
-DEPS = -I. -I./benchmarks -I./client/ -I./transport -I./system -I./statistics -I./blockchain -I./smart_contracts -I$(JEMALLOC)/include -I$(NNMSG)/include -I$(BOOST) -I$(CRYPTOPP) -I./db -I$(SQLITE)/include -I$(INFINITY)/release/include
+DEPS = -I. -I./benchmarks -I./client/ -I./transport -I./system -I./statistics -I./blockchain -I./smart_contracts -I$(JEMALLOC)/include -I$(NNMSG)/include -I$(BOOST) -I$(CRYPTOPP) -I./db -I$(SQLITE)/include
 
 
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Werror -Wno-sizeof-pointer-memaccess
-LDFLAGS = -Wall -L. -L$(NNMSG)/lib -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++0x -L$(CRYPTOPP) -L$(SQLITE)/lib -L$(INFINITY)/release
+LDFLAGS = -Wall -L. -L$(NNMSG)/lib -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++0x -L$(CRYPTOPP) -L$(SQLITE)/lib
 LDFLAGS += $(CFLAGS)
-LIBS = -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -ldl -linfinity -libverbs
+LIBS = -Wl,-Bstatic -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -Wl,-Bdynamic -libverbs -lrdmacm -ldl
 
 DB_MAINS = ./client/client_main.cpp  ./unit_tests/unit_main.cpp
 CL_MAINS = ./system/main.cpp ./unit_tests/unit_main.cpp
@@ -44,7 +43,7 @@ deps:$(CPPS_DB)
 -include obj/deps
 
 rundb : $(OBJS_DB)
-	$(CC) -static -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
 ./obj/%.o: transport/%.cpp
 	$(CC) -static -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<
 ./obj/%.o: benchmarks/%.cpp
@@ -65,7 +64,7 @@ rundb : $(OBJS_DB)
 	$(CC) -c $(CFLAGS) $(INCLUDE) -o $@ $<
 
 runcl : $(OBJS_CL)
-	$(CC) -static -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 ./obj/%.o: transport/%.cpp
 	$(CC) -static -c $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $<

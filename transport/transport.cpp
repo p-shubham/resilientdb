@@ -3,7 +3,9 @@
 #include "nn.hpp"
 #include "query.h"
 #include "message.h"
+#include "bus.hpp"
 
+#define RDMA true
 #define MAX_IFADDR_LEN 20 // max # of characters in name of address
 
 void Transport::read_ifconfig(const char *ifaddr_file)
@@ -159,9 +161,69 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
     return socket;
 }
 
+#if RDMA
+void Transport::init(){
+
+    rread_ifconfig("./ifconfig.txt");
+    int i;
+	struct ibv_device **dev_list;
+	struct ibv_device *ib_dev;
+	struct context *ctx;
+
+	srand48(getpid() * time(NULL));
+	ctx = (context *) malloc(sizeof(struct context));
+    ctx->id = g_node_id;
+    ctx->local_qp_attrs = (struct qp_attr *) malloc(
+			NODES_CNT * sizeof(struct qp_attr));
+	ctx->remote_qp_attrs = (struct qp_attr *) malloc(
+			NODES_CNT * sizeof(struct qp_attr));
+    
+	dev_list = ibv_get_device_list(NULL);
+
+    dev_list = ibv_get_device_list(NULL);
+	CPE(!dev_list, "Failed to get IB devices list", 0);
+
+	ib_dev = dev_list[0];
+	//ib_dev = dev_list[0];
+	CPE(!ib_dev, "IB device not found", 0);
+
+	init_ctx(ctx, ib_dev);
+	CPE(!ctx, "Init ctx failed", 0);
+
+    cout << "Context Initialized" << endl;
+
+	setup_buffers(ctx);
+
+	union ibv_gid my_gid = get_gid(ctx->context);
+
+	for(i = 0; i < ctx->num_conns; i++) {
+		if(i == ctx->id){
+			continue;
+		}
+		ctx->local_qp_attrs[i].id = my_gid.global.interface_id;
+		ctx->local_qp_attrs[i].lid = get_local_lid(ctx->context);
+		ctx->local_qp_attrs[i].qpn = ctx->qp[i]->qp_num;
+		ctx->local_qp_attrs[i].psn = lrand48() & 0xffffff;
+		printf("Local address of RC QP %d: ", i);
+		print_qp_attr(ctx->local_qp_attrs[i]);
+	}
+    node(g_node_id, ctx);
+	cout << "Exchange done!" << endl;
+	for(int i = 0;i < NODES_CNT; i++){
+		if(i == ctx->id){
+			continue;
+		}
+		connect_ctx(ctx, ctx->local_qp_attrs[i].psn, ctx->remote_qp_attrs[i], ctx->qp[i], 1);
+	}
+	//qp_to_rtr(ctx->qp[i], ctx);
+	cout << "QPs Connected" << endl;
+}
+#else
 void Transport::init()
 {
     _sock_cnt = get_socket_count();
+
+    //Initialize RDMA structures, exchange information required for rdma send and recv
 
     rr = 0;
     printf("Tport Init %d: %ld\n", g_node_id, _sock_cnt);
@@ -244,8 +306,16 @@ void Transport::init()
 
     fflush(stdout);
 }
-
-// rename sid to send thread id
+#endif
+// rename sid to send thread id //op thread
+// #if RDMA
+// void Transport::send_msg(uint64_t dest, void *sbuf, int size){
+//     rdma_send();
+// }
+// std::vector<Message *> * Transport::recv_msg(){
+//     rdma_recv();
+// }
+// #else
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *sbuf, int size)
 {
     uint64_t starttime = get_sys_clock();
@@ -465,6 +535,8 @@ std::vector<Message *> *Transport::recv_msg(uint64_t thd_id)
 
     return msgs;
 }
+// #endif
+
 
 /*
 void Transport::simple_send_msg(int size) {

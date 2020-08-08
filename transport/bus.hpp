@@ -1,18 +1,5 @@
-#include <iostream>
-#include <assert.h>
-#include <stdio.h>
-#include <nanomsg/nn.h>
-#include <nanomsg/pair.h>
-#include <vector>
-#include <set>
-#include <iterator>
-#include <string.h>
-#include <unistd.h>
 #include "rsupport.hpp"
 #include "nn.hpp"
-#include <fstream>
-#include <thread>
-#include <bits/stl_map.h>
 
 using namespace std;
 using namespace nn;
@@ -32,13 +19,13 @@ void print_qp_attr(struct qp_attr dest)
 uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id)
 {
     uint64_t port_id = 20000;
-    port_id += NODE_CNT * dest_node_id;
+    port_id += NODES_CNT * dest_node_id;
     port_id += src_node_id;
     return port_id;
 }
-void read_ifconfig(const char *ifaddr_file)
+void rread_ifconfig(const char *ifaddr_file)
 {
-    ifaddr = new char *[NODE_CNT];
+    ifaddr = new char *[NODES_CNT];
 
     uint64_t cnt = 0;
     printf("Reading ifconfig file: %s\n", ifaddr_file);
@@ -52,7 +39,7 @@ void read_ifconfig(const char *ifaddr_file)
         printf("%ld: %s\n", cnt, ifaddr[cnt]);
         cnt++;
     }
-    assert(cnt == NODE_CNT);
+    assert(cnt == NODES_CNT);
 }
 
 void recv_thread(int id, struct context *ctx)
@@ -60,14 +47,14 @@ void recv_thread(int id, struct context *ctx)
     // cout << "In recv" << endl;
     int count = 0, i = 0;
     set<int> counter;
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -81,7 +68,7 @@ void recv_thread(int id, struct context *ctx)
             // cout << "Recieved from " << i << endl;
         }
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -90,14 +77,14 @@ void recv_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -111,7 +98,7 @@ void recv_thread(int id, struct context *ctx)
             // cout << "Recieved from " << i << endl;
         }
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -120,14 +107,14 @@ void recv_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -149,7 +136,7 @@ void recv_thread(int id, struct context *ctx)
 		// 	exit(0);
 		// }
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -162,14 +149,14 @@ void send_thread(int id, struct context *ctx)
     // cout << "In Send" << endl;
     int i = 0, count = 0;
     set<int> counter;
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -189,7 +176,7 @@ void send_thread(int id, struct context *ctx)
         }
         
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -198,14 +185,14 @@ void send_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -219,7 +206,7 @@ void send_thread(int id, struct context *ctx)
             count++;
         }
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -227,14 +214,14 @@ void send_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODE_CNT - 1)
+    while (count <= NODES_CNT - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODE_CNT - 1)
+        if (i > NODES_CNT - 1)
         {
             i = 0;
             continue;
@@ -247,7 +234,7 @@ void send_thread(int id, struct context *ctx)
             count++;
         }
         i++;
-        if (counter.size() == NODE_CNT - 1)
+        if (counter.size() == NODES_CNT - 1)
         {
             break;
         }
@@ -256,11 +243,11 @@ void send_thread(int id, struct context *ctx)
     // cout << "Done Send" << endl;
 }
 
-int node(const int argc, const char **argv, struct context *ctx)
+int node(int node_id, struct context *ctx)
 {
-    int id = atoi(argv[1]), i;
+    int id = node_id, i;
     char myurl[30], url[30];
-    int to = 100, count = 0;
+    int to = 100;
 
     resp_area_stag[id].rkey = resp_area_mr->rkey;
     resp_area_stag[id].size = 256 * KB;
@@ -273,7 +260,7 @@ int node(const int argc, const char **argv, struct context *ctx)
     // char my_serialized_stag[sizeof(struct stag)+1];
     // serialize(node_stags[id], my_serialized_stag);
 
-    for (i = 0; i < NODE_CNT; i++)
+    for (i = 0; i < NODES_CNT; i++)
     {
         if (i == id)
             continue;
@@ -288,15 +275,14 @@ int node(const int argc, const char **argv, struct context *ctx)
         // cout << send_sockets.size() <<endl;
     }
 
-    for (i = 0; i < NODE_CNT; i++)
+    for (i = 0; i < NODES_CNT; i++)
     {
         if (i == id)
             continue;
         int temp_sock = nn_socket(AF_SP, NN_PAIR);
         uint64_t p = get_port_id(i, id);
         snprintf(myurl, 30, "tcp://%s:%ld", ifaddr[id], p);
-        int rc = nn_bind(temp_sock, myurl);
-        cout << rc << endl;
+        nn_bind(temp_sock, myurl);
         // cout << "Binded to :" << myurl << endl;
         assert(nn_setsockopt(temp_sock, NN_SOL_SOCKET, NN_RCVTIMEO, &to, sizeof(to)) >= 0);
         assert(nn_setsockopt(temp_sock, NN_SOL_SOCKET, NN_SNDTIMEO, &to, sizeof(to)) >= 0);
@@ -310,24 +296,68 @@ int node(const int argc, const char **argv, struct context *ctx)
     two.join();
     cout << "resp_area stags:" << endl;
 
-    for (int i = 0; i < NODE_CNT; i++)
+    for (int i = 0; i < NODES_CNT; i++)
     {
         if (i == id)
             continue;
         print_stag(resp_area_stag[i]);
     }
     cout << "req_area stags:" << endl;
-    for (int i = 0; i < NODE_CNT; i++)
+    for (int i = 0; i < NODES_CNT; i++)
     {
         if (i == id)
             continue;
         print_stag(req_area_stag[i]);
     }
-    for (int i = 0; i < NODE_CNT ; i++){
+    for (int i = 0; i < NODES_CNT ; i++){
         if (i == id){
             continue;
         }
         nn_shutdown(recv_sockets[i], 0);
         nn_shutdown(send_sockets[i], 0);
     }
+    return 0;
+}
+
+void rdma_send_thread(struct context *ctx, int total){
+	*req_area = 121;
+	int co = 0;
+	while(co < total){
+		for(int i = 0; i < NODES_CNT ;i++){
+			if(i == ctx->id){
+				continue;
+			}
+			int dest = i;
+			rdma_send(ctx, dest, req_area, req_area_mr->lkey,0,64);
+		}
+		co++;
+	}
+}
+
+void rdma_recv_thread(struct context *ctx, int total){
+	int co = 0;
+	while(co < total){
+		for(int i = 0; i < NODES_CNT; i++){
+			if(i == ctx->id){
+				continue;
+			}
+			int src = i;
+		 	rdma_recv(ctx, 1, src, resp_area, resp_area_mr->lkey,64);
+			cout << "RDMA Recieved Data:" << *resp_area << endl;
+		}
+		co++;
+	}
+}
+
+void singleThreadTest(struct context *ctx){
+	if(ctx->id == 0){
+		*req_area = 121;
+		int dest = 1;
+		rdma_send(ctx, dest, req_area, req_area_mr->lkey,0,64);
+	}
+	else{
+		int src = 0;
+		rdma_recv(ctx, 1, src, resp_area, resp_area_mr->lkey,64);
+		cout << "RDMA Recieved Data:" << *resp_area << endl;
+	}
 }
