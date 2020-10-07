@@ -3,12 +3,13 @@
 #include "nn.hpp"
 #include "query.h"
 #include "message.h"
+#include "bus.hpp"
 
+#define RDMA true
 #define MAX_IFADDR_LEN 20 // max # of characters in name of address
 
 void Transport::read_ifconfig(const char *ifaddr_file)
 {
-
     ifaddr = new char *[g_total_node_cnt];
 
     uint64_t cnt = 0;
@@ -160,9 +161,70 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
     return socket;
 }
 
+#if RDMA
+std::mutex bufMTX;
+void Transport::init(){
+
+    rread_ifconfig("./ifconfig.txt");
+    int i;
+	struct ibv_device **dev_list;
+	struct ibv_device *ib_dev;
+	struct context *ctx;
+
+	srand48(getpid() * time(NULL));
+	ctx = (context *) malloc(sizeof(struct context));
+    ctx->id = g_node_id;
+    ctx->local_qp_attrs = (struct qp_attr *) malloc(
+			NODES_CNT * sizeof(struct qp_attr));
+	ctx->remote_qp_attrs = (struct qp_attr *) malloc(
+			NODES_CNT * sizeof(struct qp_attr));
+    
+	dev_list = ibv_get_device_list(NULL);
+
+    dev_list = ibv_get_device_list(NULL);
+	CPE(!dev_list, "Failed to get IB devices list", 0);
+
+	ib_dev = dev_list[0];
+	//ib_dev = dev_list[0];
+	CPE(!ib_dev, "IB device not found", 0);
+
+	init_ctx(ctx, ib_dev);
+	CPE(!ctx, "Init ctx failed", 0);
+
+    cout << "Context Initialized" << endl;
+
+	setup_buffers(ctx);
+
+	union ibv_gid my_gid = get_gid(ctx->context);
+
+	for(i = 0; i < ctx->num_conns; i++) {
+		if(i == ctx->id){
+			continue;
+		}
+		ctx->local_qp_attrs[i].id = my_gid.global.interface_id;
+		ctx->local_qp_attrs[i].lid = get_local_lid(ctx->context);
+		ctx->local_qp_attrs[i].qpn = ctx->qp[i]->qp_num;
+		ctx->local_qp_attrs[i].psn = lrand48() & 0xffffff;
+		printf("Local address of RC QP %d: ", i);
+		print_qp_attr(ctx->local_qp_attrs[i]);
+	}
+    node(g_node_id, ctx);
+	cout << "Exchange done!" << endl;
+	for(int i = 0;i < NODES_CNT; i++){
+		if(i == ctx->id){
+			continue;
+		}
+		connect_ctx(ctx, ctx->local_qp_attrs[i].psn, ctx->remote_qp_attrs[i], ctx->qp[i], 0, i);
+	}
+	//qp_to_rtr(ctx->qp[i], ctx);
+	cout << "QPs Connected" << endl;
+}
+#else
 void Transport::init()
 {
     _sock_cnt = get_socket_count();
+
+    //Initialize RDMA structures, exchange information required for rdma send and recv
 
     rr = 0;
     printf("Tport Init %d: %ld\n", g_node_id, _sock_cnt);
@@ -245,8 +307,59 @@ void Transport::init()
 
     fflush(stdout);
 }
-
-// rename sid to send thread id
+#endif
+// rename sid to send thread id //op thread
+#if RDMA
+void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int size){
+    cout << "SP -->> DEBUG: SIZE OF MESSAGE: " << size << endl;
+    bufMTX.lock();
+    memcpy(client_req_[dest], sbuf, size);
+    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[ctx->id], signed_req_stag[dest].rkey[ctx->id], 0, 2)){
+        continue;
+    }
+    memset(cas_area, 0, MSG_SIZES);
+    rdma_remote_write(ctx, dest, client_req_[dest], client_req_mr[dest]->lkey, (signed_req_stag[dest].buf[ctx->id] + 8), signed_req_stag[dest].rkey[ctx->id], size);
+    cout << "SP -->> MSG WRITTEN" << endl;
+    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[ctx->id], signed_req_stag[dest].rkey[ctx->id], 2, 1)){
+        continue;
+    }
+    bufMTX.unlock();
+    cout << "SP --> DEBUG: MSG SENT to " << dest << endl;
+}
+std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
+    std::vector<Message *> *msgs = NULL;
+    uint32_t node = 0;
+    char *buf;
+    bool flag = false;
+    cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
+    fflush(stdout);
+    while(flag == false && (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+        bufMTX.lock();
+        if(node == g_node_id){
+            node++;
+            continue;
+        }
+        if(!local_cas(signed_req_area[node][0], 1, 2)){
+            node++;
+            if(node > g_total_node_cnt){
+                node = 0;
+            }
+            continue;
+        }
+        else {
+            buf = (char *)malloc(MSG_SIZES - 8);
+            memcpy(buf, signed_req_area + 8, MSG_SIZES - 8);
+            local_cas(signed_req_area[node][0], 2, 0);
+        }
+        bufMTX.unlock();
+        msgs = Message::create_messages((char *)buf);
+        flag = true;
+    }
+    cout <<"SP --> DEBUG: MSG RECVD" << endl;
+    fflush(stdout);
+    return msgs;
+}
+#else
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *sbuf, int size)
 {
     uint64_t starttime = get_sys_clock();
@@ -256,7 +369,8 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *s
     void *buf = nn_allocmsg(size, 0);
     memcpy(buf, sbuf, size);
     DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size, dest_node_id, (uint64_t)socket);
-
+    cout << "SP -->> DEBUG: SIZE OF MESSAGE: " << size << endl;
+    fflush(stdout);
 #if VIEW_CHANGES || LOCAL_FAULT
     bool failednode = false;
 
@@ -331,8 +445,8 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *s
         rc = socket->sock.send(&buf, NN_MSG, NN_DONTWAIT);
     }
 #endif
-
-    //nn_freemsg(sbuf);
+    cout << "SP --> DEBUG: MSG SENT to " << dest_node_id << endl;
+    nn_freemsg(sbuf);
     DEBUG("%ld Batch of %d bytes sent to node %ld\n", send_thread_id, size, dest_node_id);
 
     INC_STATS(send_thread_id, msg_send_time, get_sys_clock() - starttime);
@@ -466,6 +580,8 @@ std::vector<Message *> *Transport::recv_msg(uint64_t thd_id)
 
     return msgs;
 }
+#endif
+
 
 /*
 void Transport::simple_send_msg(int size) {

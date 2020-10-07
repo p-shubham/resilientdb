@@ -36,18 +36,21 @@ public:
 	Socket *bind(uint64_t port_id);
 	Socket *connect(uint64_t dest_id, uint64_t port_id);
 	void send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *sbuf, int size);
+	void send_msg(uint64_t dest, void *sbuf, int size);
 	std::vector<Message *> *recv_msg(uint64_t thd_id);
+	std::vector<Message *> *recv_msg();
+	std::vector<Message *> *rrecv_msg(uint64_t thd_id);
 	void simple_send_msg(int size);
 	uint64_t simple_recv_msg();
+	uint64_t simple_rrecv_msg();
+	uint64_t simple_send_msg();
 
 private:
 	uint64_t rr;
 	std::map<std::pair<uint64_t, uint64_t>, Socket *> send_sockets; // dest_node_id,send_thread_id : socket
 
-	// To be used by clients.
 	std::vector<Socket *> recv_sockets;
 
-	// To be used replicas.
 	std::vector<Socket *> recv_sockets_clients;
 	std::vector<Socket *> recv_sockets_servers1;
 	std::vector<Socket *> recv_sockets_servers2;

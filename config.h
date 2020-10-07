@@ -10,6 +10,11 @@
 #define PART_CNT 1 
 // Specify the number of clients. 
 #define CLIENT_NODE_CNT 1
+/*
+*CLIENT_THREAD_CNT: Total threads at CLIENT
+*CLIENT_REM_THREAD_CNT: Total Input threads at CLIENT
+*CLIENT_SEND_THREAD_CNT:Total Output thread at CLIENT
+*/
 #define CLIENT_THREAD_CNT 2 
 #define CLIENT_REM_THREAD_CNT 1 
 #define CLIENT_SEND_THREAD_CNT 1 
@@ -159,14 +164,14 @@
 #define RBFT_ON false 
 // Select the type of RBFT, (1) RBFT+PBFT, and  (2) RBFT+DBFT 
 #define RBFT_ALG RPBFT 
-#define RPBFT 1  
+#define RPBFT 1 
 #define RDBFT 2 
 // Enable or Disable pipeline at primary replica. 
 #define ENABLE_PIPELINE true 
 // Number of threads to create batches at primary replica.  
 #define BATCH_THREADS 2 
 // Size of each batch. 
-#define BATCH_SIZE 100 
+#define BATCH_SIZE 10000
 #define BATCH_ENABLE BSET 
 #define BSET 1 
 #define BUNSET 0 
@@ -212,15 +217,10 @@
 #define M200 2	// 200KB. 
 #define M400 3	// 400KB. 
 
-// To allow testing in-memory database or SQLite. 
-// Further, using SQLite a user can also choose to persist the data. 
-#define EXT_DB MEMORY
+#define EXT_DB SQL
 #define MEMORY 1
 #define SQL 2
 #define SQL_PERSISTENT 3
-
-// To allow testing of a Banking Smart Contracts. 
-#define BANKING_SMART_CONTRACT false
 
 #endif
 

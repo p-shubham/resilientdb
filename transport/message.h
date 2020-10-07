@@ -417,6 +417,20 @@ public:
 };
 
 /****************************************/
+/*                RDMA                  */
+/****************************************/
+
+class RDMAMessage : public Message 
+{
+    public:
+        void copy_from_buf(char *buf);
+        void copy_to_buf(char *buf);
+        uint64_t get_size();
+
+        uint64_t msg;
+};
+
+/****************************************/
 /*	VIEW CHANGE SPECIFIC		*/
 /****************************************/
 
