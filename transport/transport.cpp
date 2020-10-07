@@ -162,14 +162,13 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
 }
 
 #if RDMA
-std::mutex bufMTX;
+
 void Transport::init(){
 
     rread_ifconfig("./ifconfig.txt");
     int i;
 	struct ibv_device **dev_list;
 	struct ibv_device *ib_dev;
-	struct context *ctx;
 
 	srand48(getpid() * time(NULL));
 	ctx = (context *) malloc(sizeof(struct context));
@@ -188,7 +187,7 @@ void Transport::init(){
 	//ib_dev = dev_list[0];
 	CPE(!ib_dev, "IB device not found", 0);
 
-	init_ctx(ctx, ib_dev);
+	init_ctx(ib_dev);
 	CPE(!ctx, "Init ctx failed", 0);
 
     cout << "Context Initialized" << endl;
@@ -311,20 +310,20 @@ void Transport::init()
 // rename sid to send thread id //op thread
 #if RDMA
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int size){
-    cout << "SP -->> DEBUG: SIZE OF MESSAGE: " << size << endl;
-    bufMTX.lock();
+    // cout << "SP -->> DEBUG: SENDING " << size << "FROM " << g_node_id << "TO" << dest << endl;
+    bufRDMASENDMTX.lock();
     memcpy(client_req_[dest], sbuf, size);
-    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[ctx->id], signed_req_stag[dest].rkey[ctx->id], 0, 2)){
+    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[g_node_id], signed_req_stag[dest].rkey[g_node_id], 0, 2)){
         continue;
     }
     memset(cas_area, 0, MSG_SIZES);
-    rdma_remote_write(ctx, dest, client_req_[dest], client_req_mr[dest]->lkey, (signed_req_stag[dest].buf[ctx->id] + 8), signed_req_stag[dest].rkey[ctx->id], size);
-    cout << "SP -->> MSG WRITTEN" << endl;
-    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[ctx->id], signed_req_stag[dest].rkey[ctx->id], 2, 1)){
+    rdma_remote_write(ctx, dest, client_req_[dest], client_req_mr[dest]->lkey, (signed_req_stag[dest].buf[g_node_id] + 8), signed_req_stag[dest].rkey[g_node_id], size);
+    // cout << "SP -->> MSG WRITTEN" << endl;
+    while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[g_node_id], signed_req_stag[dest].rkey[g_node_id], 2, 1)){
         continue;
     }
-    bufMTX.unlock();
-    cout << "SP --> DEBUG: MSG SENT to " << dest << endl;
+    bufRDMASENDMTX.unlock();
+    // cout << "SP --> DEBUG: MSG SENT to " << dest << endl;
 }
 std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     std::vector<Message *> *msgs = NULL;
@@ -334,7 +333,7 @@ std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
     fflush(stdout);
     while(flag == false && (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
-        bufMTX.lock();
+        bufRDMARECVMTX.lock();
         if(node == g_node_id){
             node++;
             continue;
@@ -351,7 +350,7 @@ std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
             memcpy(buf, signed_req_area + 8, MSG_SIZES - 8);
             local_cas(signed_req_area[node][0], 2, 0);
         }
-        bufMTX.unlock();
+        bufRDMARECVMTX.unlock();
         msgs = Message::create_messages((char *)buf);
         flag = true;
     }

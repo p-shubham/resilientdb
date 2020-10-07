@@ -113,8 +113,7 @@ struct context
 
 struct context *ctx;
 
-
-static struct context *init_ctx(struct context *ctx, struct ibv_device *ib_dev)
+static struct context *init_ctx(struct ibv_device *ib_dev)
 {
     ctx->context = ibv_open_device(ib_dev);
     CPE(!ctx->context, "Couldn't get context", 0);

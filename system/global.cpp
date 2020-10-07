@@ -162,6 +162,10 @@ string calculateHash(string str)
 	return std::string((char *)aDigest, CryptoPP::SHA256::DIGESTSIZE);
 }
 
+//RDMA Mutex
+std::mutex bufRDMASENDMTX;
+std::mutex bufRDMARECVMTX;
+
 // Entities for maintaining g_next_index.
 uint64_t g_next_index = 0; //index of the next txn to be executed
 std::mutex gnextMTX;

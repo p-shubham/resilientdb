@@ -261,6 +261,11 @@ enum access_t
 #define INDEX IndexHash
 #endif
 
+//RDMA Mutex
+extern std::mutex bufRDMASENDMTX;
+extern std::mutex bufRDMARECVMTX;
+
+
 /************************************************/
 // constants
 /************************************************/
