@@ -4,7 +4,7 @@
 #define NODE_CNT 4
 // Number of worker threads at primary. For RBFT (6) and other algorithms (5). 
 #define THREAD_CNT 5 
-#define REM_THREAD_CNT 3
+#define REM_THREAD_CNT 1
 #define SEND_THREAD_CNT 1 
 #define CORE_CNT 8 
 #define PART_CNT 1 

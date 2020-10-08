@@ -328,34 +328,30 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int
 std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     std::vector<Message *> *msgs = NULL;
     uint32_t node = 0;
-    char *buf;
-    bool flag = false;
-    cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
+    char *buf = (char *)malloc(MSG_SIZES);
+    // cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
     fflush(stdout);
-    while(flag == false && (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
-        bufRDMARECVMTX.lock();
-        if(node == g_node_id){
-            node++;
-            continue;
-        }
-        if(!local_cas(signed_req_area[node][0], 1, 2)){
-            node++;
-            if(node > g_total_node_cnt){
-                node = 0;
-            }
-            continue;
-        }
-        else {
-            buf = (char *)malloc(MSG_SIZES - 8);
-            memcpy(buf, signed_req_area + 8, MSG_SIZES - 8);
-            local_cas(signed_req_area[node][0], 2, 0);
-        }
-        bufRDMARECVMTX.unlock();
-        msgs = Message::create_messages((char *)buf);
-        flag = true;
+    while((!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+		if(node == g_node_id){
+			node++;
+		}
+		if (node > g_total_node_cnt - 1){
+			node = 0;
+			continue;
+		}
+		if(!local_cas(&signed_req_area[node][0], 1, 2)){
+			// cout << (int)signed_req_area[node][0] << endl;
+			node++;
+			continue;
+		} else {
+			strcpy(buf, signed_req_area[node] + 8);
+			local_cas(&signed_req_area[node][0], 2, 0);
+			// cout << (int)signed_req_area[node][0] << endl;
+			break;
+		}
     }
-    cout <<"SP --> DEBUG: MSG RECVD" << endl;
-    fflush(stdout);
+    msgs = Message::create_messages((char *)buf);
+    // free(buf);
     return msgs;
 }
 #else

@@ -653,6 +653,6 @@ bool rdma_cas(struct context *ctx, int dest, char *local_addr, int local_key, un
     return (int)local_addr[0] == (int)compare;
 }
 
-bool local_cas(char a, int c, int s){
-	return (__sync_val_compare_and_swap(&a, c, s) == c);
+bool local_cas(char* a, int c, int s){
+    return __sync_bool_compare_and_swap(a, c, s);
 }
