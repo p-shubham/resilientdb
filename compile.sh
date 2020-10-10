@@ -1,4 +1,4 @@
 make clean
-make -j16
-scp rundb shubhamp@pronghorn.rc.unr.edu:~/resDB/ &
-scp runcl shubhamp@pronghorn.rc.unr.edu:~/resDB/ 
+singularity exec resilient make -j32
+cp rundb ~/resDB
+cp runcl ~/resDB

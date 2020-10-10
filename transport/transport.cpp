@@ -8,6 +8,7 @@
 #define RDMA true
 #define MAX_IFADDR_LEN 20 // max # of characters in name of address
 
+
 void Transport::read_ifconfig(const char *ifaddr_file)
 {
     ifaddr = new char *[g_total_node_cnt];
@@ -224,8 +225,6 @@ void Transport::init()
     _sock_cnt = get_socket_count();
 
     //Initialize RDMA structures, exchange information required for rdma send and recv
-
-    rr = 0;
     printf("Tport Init %d: %ld\n", g_node_id, _sock_cnt);
 
     string path = get_path();
@@ -325,10 +324,12 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int
     bufRDMASENDMTX.unlock();
     // cout << "SP --> DEBUG: MSG SENT to " << dest << endl;
 }
+
 std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     std::vector<Message *> *msgs = NULL;
     uint32_t node = 0;
     char *buf = (char *)malloc(MSG_SIZES);
+    memset(buf, 0, MSG_SIZES);
     // cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
     fflush(stdout);
     while((!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
@@ -344,14 +345,13 @@ std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
 			node++;
 			continue;
 		} else {
-			strcpy(buf, signed_req_area[node] + 8);
+			memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
 			local_cas(&signed_req_area[node][0], 2, 0);
 			// cout << (int)signed_req_area[node][0] << endl;
 			break;
 		}
     }
     msgs = Message::create_messages((char *)buf);
-    // free(buf);
     return msgs;
 }
 #else
@@ -364,8 +364,8 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *s
     void *buf = nn_allocmsg(size, 0);
     memcpy(buf, sbuf, size);
     DEBUG("%ld Sending batch of %d bytes to node %ld on socket %ld\n", send_thread_id, size, dest_node_id, (uint64_t)socket);
-    cout << "SP -->> DEBUG: SIZE OF MESSAGE: " << size << endl;
-    fflush(stdout);
+    // cout << "SP -->> DEBUG: SIZE OF MESSAGE: " << size << endl;
+    // fflush(stdout);
 #if VIEW_CHANGES || LOCAL_FAULT
     bool failednode = false;
 
@@ -440,7 +440,7 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest_node_id, void *s
         rc = socket->sock.send(&buf, NN_MSG, NN_DONTWAIT);
     }
 #endif
-    cout << "SP --> DEBUG: MSG SENT to " << dest_node_id << endl;
+    // cout << "SP --> DEBUG: MSG SENT to " << dest_node_id << endl;
     nn_freemsg(sbuf);
     DEBUG("%ld Batch of %d bytes sent to node %ld\n", send_thread_id, size, dest_node_id);
 

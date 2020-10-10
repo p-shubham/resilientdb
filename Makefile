@@ -1,4 +1,4 @@
-CC=g++
+CC=g++-7
 CFLAGS=-Wall -g -gdwarf-3 -std=c++0x -rdynamic -libverbs -lnanomsg#
 JEMALLOC=deps/jemalloc-5.1.0
 NNMSG=deps/nanomsg-1.1.4
@@ -15,7 +15,7 @@ DEPS = -I. -I./benchmarks -I./client/ -I./transport -I./system -I./statistics -I
 CFLAGS += $(DEPS) -D NOGRAPHITE=1 -Werror -Wno-sizeof-pointer-memaccess
 LDFLAGS = -Wall -L. -L$(NNMSG)/lib -L$(JEMALLOC)/lib -Wl,-rpath,$(JEMALLOC)/lib -pthread -gdwarf-3 -lrt -std=c++0x -L$(CRYPTOPP) -L$(SQLITE)/lib
 LDFLAGS += $(CFLAGS)
-LIBS = -Wl,-Bstatic -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -Wl,-Bdynamic -libverbs -lrdmacm -ldl
+LIBS = -Wl,-Bstatic -lnanomsg -lanl -ljemalloc -lcryptopp -lsqlite3 -Wl,-Bdynamic -libverbs -ldl
 
 DB_MAINS = ./client/client_main.cpp  ./unit_tests/unit_main.cpp
 CL_MAINS = ./system/main.cpp ./unit_tests/unit_main.cpp

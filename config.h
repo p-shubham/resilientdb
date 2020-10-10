@@ -171,7 +171,7 @@
 // Number of threads to create batches at primary replica.  
 #define BATCH_THREADS 2 
 // Size of each batch. 
-#define BATCH_SIZE 10000
+#define BATCH_SIZE 100
 #define BATCH_ENABLE BSET 
 #define BSET 1 
 #define BUNSET 0 
