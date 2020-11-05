@@ -15,13 +15,13 @@ void print_qp_attr(struct qp_attr dest)
 uint64_t get_port_id(uint64_t src_node_id, uint64_t dest_node_id)
 {
     uint64_t port_id = 20000;
-    port_id += NODES_CNT * dest_node_id;
+    port_id += g_total_node_cnt * dest_node_id;
     port_id += src_node_id;
     return port_id;
 }
 void rread_ifconfig(const char *ifaddr_file)
 {
-    ifaddr = new char *[NODES_CNT];
+    ifaddr = new char *[g_total_node_cnt];
 
     uint64_t cnt = 0;
     printf("Reading ifconfig file: %s\n", ifaddr_file);
@@ -35,7 +35,7 @@ void rread_ifconfig(const char *ifaddr_file)
         printf("%ld: %s\n", cnt, ifaddr[cnt]);
         cnt++;
     }
-    assert(cnt == NODES_CNT);
+    assert(cnt == g_total_node_cnt);
 }
 
 void recv_thread(int id, struct context *ctx)
@@ -43,14 +43,14 @@ void recv_thread(int id, struct context *ctx)
     // cout << "In recv" << endl;
     int count = 0, i = 0;
     set<int> counter;
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -64,7 +64,7 @@ void recv_thread(int id, struct context *ctx)
             // cout << "Recieved from " << i << endl;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -73,14 +73,14 @@ void recv_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -94,7 +94,7 @@ void recv_thread(int id, struct context *ctx)
             // cout << "Recieved from " << i << endl;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -102,14 +102,14 @@ void recv_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -123,7 +123,7 @@ void recv_thread(int id, struct context *ctx)
             // cout << "Recieved from " << i << endl;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -132,14 +132,14 @@ void recv_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -156,7 +156,7 @@ void recv_thread(int id, struct context *ctx)
 		print_qp_attr(ctx->remote_qp_attrs[i]);
 		
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -169,14 +169,14 @@ void send_thread(int id, struct context *ctx)
     // cout << "In Send" << endl;
     int i = 0, count = 0;
     set<int> counter;
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -196,7 +196,7 @@ void send_thread(int id, struct context *ctx)
         }
         
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -205,14 +205,14 @@ void send_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -226,7 +226,7 @@ void send_thread(int id, struct context *ctx)
             count++;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -234,14 +234,14 @@ void send_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -255,7 +255,7 @@ void send_thread(int id, struct context *ctx)
             count++;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -263,14 +263,14 @@ void send_thread(int id, struct context *ctx)
     count = 0;
     i = 0;
     counter.clear();
-    while (count <= NODES_CNT - 1)
+    while (count <= g_total_node_cnt - 1)
     {
         if (i == id || counter.count(i) > 0)
         {
             i++;
             continue;
         }
-        if (i > NODES_CNT - 1)
+        if (i > g_total_node_cnt - 1)
         {
             i = 0;
             continue;
@@ -283,7 +283,7 @@ void send_thread(int id, struct context *ctx)
             count++;
         }
         i++;
-        if (counter.size() == NODES_CNT - 1)
+        if (counter.size() == g_total_node_cnt - 1)
         {
             break;
         }
@@ -292,27 +292,27 @@ void send_thread(int id, struct context *ctx)
     // cout << "Done Send" << endl;
 }
 
-int node(int node_id, struct context *ctx)
+int node(int node_id)
 {
     int id = node_id, i;
     char myurl[30], url[30];
     int to = 100;
 
-    for(int i = 0; i< NODES_CNT; i++){
+    for(int i = 0; i< g_total_node_cnt; i++){
         signed_req_stag[id].rkey[i] = signed_req_mr[i]->rkey;
         signed_req_stag[id].buf[i] = (uintptr_t) signed_req_area[i];
     }
     signed_req_stag[id].size = MSG_SIZES;
     signed_req_stag[id].id = id;
 
-    for(int i = 0; i< NODES_CNT ; i++){
+    for(int i = 0; i< CLIENT_REQ_NUM ; i++){
         client_req_stag[id].rkey[i] = client_req_mr[i]->rkey;
         client_req_stag[id].buf[i] = (uintptr_t) client_req_[i];
     }
     client_req_stag[id].size = MSG_SIZES;
     client_req_stag[id].id = id;
 
-    for(int i = 0; i< NODES_CNT; i++){
+    for(int i = 0; i< g_total_node_cnt; i++){
         replica_mem_stag[id].rkey[i] = replica_mem_mr[i]->rkey;
         replica_mem_stag[id].buf[i] = (uintptr_t) replica_mem_area[i];
     }
@@ -322,7 +322,7 @@ int node(int node_id, struct context *ctx)
     // char my_serialized_stag[sizeof(struct stag)+1];
     // serialize(node_stags[id], my_serialized_stag);
 
-    for (i = 0; i < NODES_CNT; i++)
+    for (i = 0; i < g_total_node_cnt; i++)
     {
         if (i == id)
             continue;
@@ -337,7 +337,7 @@ int node(int node_id, struct context *ctx)
         // cout << send_sockets.size() <<endl;
     }
 
-    for (i = 0; i < NODES_CNT; i++)
+    for (i = 0; i < g_total_node_cnt; i++)
     {
         if (i == id)
             continue;
@@ -358,30 +358,31 @@ int node(int node_id, struct context *ctx)
     one.join();
     two.join();
     //DEBUG
-    cout << "BUS DEBUG: client_area stags:" << endl;
+    // cout << "BUS DEBUG: client_area stags:" << endl;
 
-    for (int i = 0; i < NODES_CNT; i++)
-    {
-        if (i == id)
-            continue;
-        print_stag(client_req_stag[i]);
-    }
-    cout << "BUS DEBUG: signed_area stags:" << endl;
-    for (int i = 0; i < NODES_CNT; i++)
-    {
-        if (i == id)
-            continue;
-        print_stag(signed_req_stag[i]);
-    }
+    // for (int i = 0; i < g_total_node_cnt; i++)
+    // {
+    //     if (i == id)
+    //         continue;
+    //     print_stag(client_req_stag[i]);
+    // }
+    // cout << "BUS DEBUG: signed_area stags:" << endl;
+    // for (int i = 0; i < g_total_node_cnt; i++)
+    // {
+    //     if (i == id)
+    //         continue;
+    //     print_stag(signed_req_stag[i]);
+    // }
     cout << "BUS DEBUG: replica_area stags:" << endl;
-    for (int i = 0; i < NODES_CNT; i++)
+    fflush(stdout);
+    for (int i = 0; i < g_total_node_cnt; i++)
     {
         if (i == id)
             continue;
         print_stag(replica_mem_stag[i]);
     }
     //DEBUG
-    for (int i = 0; i < NODES_CNT ; i++){
+    for (int i = 0; i < g_total_node_cnt ; i++){
         if (i == id){
             continue;
         }

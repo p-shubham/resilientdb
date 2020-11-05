@@ -21,12 +21,12 @@
 
 using namespace std;
 
-#define NODES_CNT 5
+#define g_total_node_cnt 5
 #define TX_DEPTH 2048
 #define PRIMARY_IB_PORT 1
 #define KB 1024
-#define MSG_SIZES MSG_SIZE_MAX //520204 Bytes
-#define CLIENT_REQ_NUM 500
+#define MSG_SIZES MSG_SIZE_MAX * 2 //520204 Bytes
+#define CLIENT_REQ_NUM 5
 
 #define CPE(val, msg, err_code)                    \
     if (val)                                       \
@@ -37,7 +37,7 @@ using namespace std;
     }
 
 std::mutex mtx;
-
+std::mutex accmtx;
 //These are the memory regions
 char **client_req_, **signed_req_area, **replica_mem_area, **exec_mem_area, *local_area, *cas_area, *read_area;
 
@@ -52,7 +52,7 @@ void create_qp(struct context *ctx);
 void qp_to_init(struct context* ctx);
 static void destroy_ctx(struct context *ctx);
 static int tcp_exchange_qp_info();
-int setup_buffers(struct context *ctx);
+int setup_buffers();
 static int qp_to_rtr(struct ibv_qp *qp, struct context *ctx);
 static int qp_to_rts(struct ibv_qp *qp, struct context *ctx);
 
@@ -81,14 +81,14 @@ struct qp_attr
 struct stag
 {
     uint32_t id;
-    unsigned long buf[NODES_CNT];
-	uint32_t rkey[NODES_CNT];
+    unsigned long buf[CLIENT_REQ_NUM];
+	uint32_t rkey[g_total_node_cnt]; //
 	uint32_t size;
 
 };
 
 //Stag for response and request
-struct stag client_req_stag[NODES_CNT], signed_req_stag[NODES_CNT] ,replica_mem_stag[NODES_CNT], exec_mem_stag[NODES_CNT];
+struct stag client_req_stag[g_total_node_cnt], signed_req_stag[g_total_node_cnt] ,replica_mem_stag[g_total_node_cnt], exec_mem_stag[g_total_node_cnt];
 
 struct context
 {
@@ -113,16 +113,28 @@ struct context
 
 struct context *ctx;
 
-static struct context *init_ctx(struct ibv_device *ib_dev)
-{
+// Initializes all the context related artifacts for the RDMA communication
+static struct context *init_ctx()
+{   
+    struct ibv_device **dev_list;
+	struct ibv_device *ib_dev;
+    srand48(getpid() * time(NULL));
+	ctx = (context *) malloc(sizeof(struct context));
+    ctx->id = g_node_id;
+    ctx->local_qp_attrs = (struct qp_attr *) malloc(
+			g_total_node_cnt * sizeof(struct qp_attr));
+	ctx->remote_qp_attrs = (struct qp_attr *) malloc(
+			g_total_node_cnt * sizeof(struct qp_attr));
+    dev_list = ibv_get_device_list(NULL);
+	CPE(!dev_list, "Failed to get IB devices list", 0);
+	ib_dev = dev_list[0];
+	//ib_dev = dev_list[0];
+	CPE(!ib_dev, "IB device not found", 0);
     ctx->context = ibv_open_device(ib_dev);
     CPE(!ctx->context, "Couldn't get context", 0);
-
     ctx->pd = ibv_alloc_pd(ctx->context);
     CPE(!ctx->pd, "Couldn't allocate PD", 0);
-
-    ctx->num_conns = NODES_CNT;
-
+    ctx->num_conns = g_total_node_cnt;
     create_qp(ctx);
     qp_to_init(ctx);
 
@@ -187,8 +199,31 @@ uint16_t get_local_lid(struct ibv_context *context)
 	return attr.lid;
 }
 
+int a[3] = {0, 1, 4};
+int get_next_num(int thd_id){
+    accmtx.lock();
+    if(thd_id % g_rem_thread_cnt == 0){
+        int nn = a[0];
+        a[0]+=2;
+        if (a[0] >= 4){
+            a[0] = 0;
+        }
+        return nn;
+    }
+    else if(thd_id % g_rem_thread_cnt == 1){
+        int nn = a[1];
+        a[1] += 2;
+        if (a[1] >= 4){
+            a[1] = 1;
+        }
+        return nn;
+    } else {
+        return a[2];
+    }
+    accmtx.unlock();
+}
 
-int connect_ctx(struct context *ctx, int my_psn, struct qp_attr dest, struct ibv_qp* qp, int use_uc, int i)
+int connect_ctx(int my_psn, struct qp_attr dest, struct ibv_qp* qp, int use_uc, int i)
 {
 	struct ibv_qp_attr *conn_attr;
     conn_attr = (struct ibv_qp_attr *)malloc(sizeof(struct ibv_qp_attr));
@@ -316,53 +351,55 @@ static int poll_cq(struct ibv_cq *cq, int num_completions)
 
 /*For Multiple Memory Registration*/
 
-int setup_client_buffer(struct context *ctx){
+int setup_client_buffer(){
     int FLAGS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | 
 			IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
-    client_req_ = (char **) malloc(CLIENT_REQ_NUM*sizeof(char *));
+    client_req_ = (char **) malloc(CLIENT_REQ_NUM*sizeof(char *)); // TODO: indexSize
     client_req_mr = (struct ibv_mr **) malloc(CLIENT_REQ_NUM*sizeof(struct ibv_mr *));
-    for(int i = 0; i < NODES_CNT;i++){
+    for(int i = 0; i < CLIENT_REQ_NUM;i++){
         // cout << "DEBUG MEM: CLIENT" << i << endl;
         client_req_[i] = (char *) malloc(MSG_SIZES);
         client_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) client_req_[i], MSG_SIZES, FLAGS);
-        memset( client_req_[i], 0, MSG_SIZES);
+        memset(client_req_[i], 0, MSG_SIZES);
     }
     return 0;
 }
 
-int setup_buffers(struct context* ctx){
+int setup_buffers(){ // TODO: ctx is global variable
     int FLAGS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | 
 				IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
-
-    signed_req_area = ( char **) malloc(NODES_CNT*sizeof(char *));
-    signed_req_mr = (struct ibv_mr **) malloc(NODES_CNT*sizeof(struct ibv_mr *));
-    for(int i = 0; i < NODES_CNT;i++){
+    
+    // Location for storing request signed by primary.
+    signed_req_area = ( char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: indexSize / Brainstorm application of lock free Queues
+    signed_req_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
+    for(int i = 0; i < g_total_node_cnt;i++){ 
         // cout << "DEBUG MEM: SIGNED" << i << endl;
         signed_req_area[i] = (char *) memalign(512, MSG_SIZES);
         signed_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) signed_req_area[i], MSG_SIZES, FLAGS);
         memset(signed_req_area[i], 0 , MSG_SIZES);
     }
 
-    replica_mem_area = (char **) malloc(NODES_CNT*sizeof(char *));
-    replica_mem_mr = (struct ibv_mr **) malloc(NODES_CNT*sizeof(struct ibv_mr *));
-    for(int i = 0; i < NODES_CNT;i++){
+    // Location for storing request taken from Primary's signed area.
+    replica_mem_area = (char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: should be g_rem_thread_cnt
+    replica_mem_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
+    for(int i = 0; i < g_total_node_cnt;i++){
         // cout << "DEBUG MEM: REPLICA" << i << endl;
         replica_mem_area[i] = (char *) memalign(512, MSG_SIZES);
         replica_mem_mr[i] = ibv_reg_mr(ctx->pd, (char *) replica_mem_area[i], MSG_SIZES, FLAGS);
         memset(replica_mem_area[i], 0 , MSG_SIZES);
     }
 
-    exec_mem_area = (char **) malloc(NODES_CNT*NODES_CNT*sizeof(char *));
-    exec_mem_mr = (struct ibv_mr **) malloc(NODES_CNT*NODES_CNT*sizeof(struct ibv_mr *));
-    for(int i = 0; i < NODES_CNT * NODES_CNT;i++){
+    exec_mem_area = (char **) malloc(g_total_node_cnt*g_total_node_cnt*sizeof(char *)); //TODO: remove this
+    exec_mem_mr = (struct ibv_mr **) malloc(g_total_node_cnt*g_total_node_cnt*sizeof(struct ibv_mr *));
+    for(int i = 0; i < g_total_node_cnt * g_total_node_cnt;i++){
         // cout << "DEBUG MEM: EXEC" << i << endl;
         exec_mem_area[i] = (char *) memalign(512, MSG_SIZES);
         exec_mem_mr[i] = ibv_reg_mr(ctx->pd, (char *) exec_mem_area[i], MSG_SIZES, FLAGS);
         memset(exec_mem_area[i], 0 , MSG_SIZES);
     }
 
-    local_area = (char *) memalign(512, MSG_SIZES);
-    local_area_mr = ibv_reg_mr(ctx->pd, (char *) local_area, MSG_SIZES / 2, FLAGS);
+    local_area = (char *) memalign(512, MSG_SIZES); // TODO: message size should be MAX_MSG_SIZE
+    local_area_mr = ibv_reg_mr(ctx->pd, (char *) local_area, MSG_SIZES, FLAGS);
     memset(local_area, 0, MSG_SIZES);
 
     cas_area = (char *) memalign(512, MSG_SIZES);
@@ -373,7 +410,7 @@ int setup_buffers(struct context* ctx){
     read_area_mr = ibv_reg_mr(ctx->pd, (char *) read_area, MSG_SIZES / 2, FLAGS);
     memset(read_area, 0, MSG_SIZES);
 
-    setup_client_buffer(ctx);
+    setup_client_buffer();
     return 0;
 }
 
@@ -611,7 +648,7 @@ static void detroy_ctx(struct context *ctx)
 void print_stag(struct stag st)
 {
 	fflush(stdout);
-    for(int i = 0; i < NODES_CNT; i++){
+    for(int i = 0; i < g_total_node_cnt; i++){
 	    printf("Stag: \t id: %u, buf_region for node %d: %lu, rkey for node %d: %u, size: %u\n", st.id , i,st.buf[i], i,st.rkey[i], st.size);
     }
 }
@@ -634,7 +671,8 @@ void rdma_local_write(struct context *ctx, void* local_area, void* buf){
 	strcpy((char *)local_area, (char *)buf);
 }
 int rdma_remote_write(struct context *ctx, int dest, char *local_area, int lkey, unsigned long remote_buf, int rkey, int size){
-	post_write(ctx, dest, local_area, lkey, remote_buf, rkey, 1, size);
+	post_write(ctx, dest, local_area, lkey, remote_buf, rkey, 0, size);
+    // return 1;
 	return poll_cq(ctx->cq[dest], 1);
 }
 void* rdma_local_read(struct context *ctx, void* local_area){

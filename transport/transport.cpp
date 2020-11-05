@@ -7,6 +7,7 @@
 
 #define RDMA true
 #define MAX_IFADDR_LEN 20 // max # of characters in name of address
+uint64_t arr[3] = {4, 1, 2};
 
 
 void Transport::read_ifconfig(const char *ifaddr_file)
@@ -163,41 +164,15 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
 }
 
 #if RDMA
-
 void Transport::init(){
 
-    rread_ifconfig("./ifconfig.txt");
-    int i;
-	struct ibv_device **dev_list;
-	struct ibv_device *ib_dev;
-
-	srand48(getpid() * time(NULL));
-	ctx = (context *) malloc(sizeof(struct context));
-    ctx->id = g_node_id;
-    ctx->local_qp_attrs = (struct qp_attr *) malloc(
-			NODES_CNT * sizeof(struct qp_attr));
-	ctx->remote_qp_attrs = (struct qp_attr *) malloc(
-			NODES_CNT * sizeof(struct qp_attr));
-    
-	dev_list = ibv_get_device_list(NULL);
-
-    dev_list = ibv_get_device_list(NULL);
-	CPE(!dev_list, "Failed to get IB devices list", 0);
-
-	ib_dev = dev_list[0];
-	//ib_dev = dev_list[0];
-	CPE(!ib_dev, "IB device not found", 0);
-
-	init_ctx(ib_dev);
+    rread_ifconfig("./ifconfig.txt"); // TODO: Why?
+	init_ctx();
 	CPE(!ctx, "Init ctx failed", 0);
-
     cout << "Context Initialized" << endl;
-
-	setup_buffers(ctx);
-
+	setup_buffers(); // TODO
 	union ibv_gid my_gid = get_gid(ctx->context);
-
-	for(i = 0; i < ctx->num_conns; i++) {
+	for(int i = 0; i < ctx->num_conns; i++) {
 		if(i == ctx->id){
 			continue;
 		}
@@ -208,13 +183,13 @@ void Transport::init(){
 		printf("Local address of RC QP %d: ", i);
 		print_qp_attr(ctx->local_qp_attrs[i]);
 	}
-    node(g_node_id, ctx);
+    node(g_node_id); //TODO : Change all the irrelevant variables
 	cout << "Exchange done!" << endl;
-	for(int i = 0;i < NODES_CNT; i++){
+	for(int i = 0;i < g_total_node_cnt; i++){
 		if(i == ctx->id){
 			continue;
 		}
-		connect_ctx(ctx, ctx->local_qp_attrs[i].psn, ctx->remote_qp_attrs[i], ctx->qp[i], 0, i);
+		connect_ctx(ctx->local_qp_attrs[i].psn, ctx->remote_qp_attrs[i], ctx->qp[i], 0, i);
 	}
 	//qp_to_rtr(ctx->qp[i], ctx);
 	cout << "QPs Connected" << endl;
@@ -310,7 +285,8 @@ void Transport::init()
 #if RDMA
 void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int size){
     // cout << "SP -->> DEBUG: SENDING " << size << "FROM " << g_node_id << "TO" << dest << endl;
-    bufRDMASENDMTX.lock();
+    uint64_t starttime = get_sys_clock();
+    // bufRDMASENDMTX.lock();
     memcpy(client_req_[dest], sbuf, size);
     while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[g_node_id], signed_req_stag[dest].rkey[g_node_id], 0, 2)){
         continue;
@@ -321,37 +297,110 @@ void Transport::send_msg(uint64_t send_thread_id, uint64_t dest, void *sbuf, int
     while(!rdma_cas(ctx, dest, cas_area, cas_area_mr->lkey, signed_req_stag[dest].buf[g_node_id], signed_req_stag[dest].rkey[g_node_id], 2, 1)){
         continue;
     }
-    bufRDMASENDMTX.unlock();
+    // bufRDMASENDMTX.unlock();
     // cout << "SP --> DEBUG: MSG SENT to " << dest << endl;
+    INC_STATS(send_thread_id, msg_send_time, get_sys_clock() - starttime);
+    INC_STATS(send_thread_id, msg_send_cnt, 1);
 }
 
 std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     std::vector<Message *> *msgs = NULL;
-    uint32_t node = 0;
+    uint32_t node = (g_rem_thread_cnt == 1) ? 0 : (thd_id % g_rem_thread_cnt); // TODO : Find a generic optimum relation
     char *buf = (char *)malloc(MSG_SIZES);
+    uint64_t starttime = get_sys_clock();
+    // uint64_t ctr;
     memset(buf, 0, MSG_SIZES);
-    // cout <<"SP --> DEBUG: MSG RECV CALLED" << endl;
-    fflush(stdout);
-    while((!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
-		if(node == g_node_id){
-			node++;
-		}
-		if (node > g_total_node_cnt - 1){
-			node = 0;
-			continue;
-		}
-		if(!local_cas(&signed_req_area[node][0], 1, 2)){
-			// cout << (int)signed_req_area[node][0] << endl;
-			node++;
-			continue;
-		} else {
-			memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
-			local_cas(&signed_req_area[node][0], 2, 0);
-			// cout << (int)signed_req_area[node][0] << endl;
-			break;
-		}
+    // cout << "SP --> RECV: RDMA" << endl;
+    // fflush(stdout);
+    if(ISSERVER) {
+        while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+            if(thd_id % g_rem_thread_cnt == 1){
+                if(node == g_node_id){
+                    node++;
+                }
+                if (node > g_total_node_cnt - 2){
+                    node = 0;
+                    continue;
+                }
+                if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                    // cout << "SP: " << (int)signed_req_area[node][0] << endl;
+                    node++;
+                    continue;
+                } else {
+                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
+                    // memset(signed_req_area[node], 0 , 8);
+                    local_cas(&signed_req_area[node][0], 2, 0);
+                    msgs = Message::create_messages((char *)buf);
+                    bufRDMARECVMTX.unlock();
+                    INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+                    INC_STATS(thd_id, msg_recv_cnt, 1);
+                    return msgs;
+                    // cout << "SP: " << g_node_id << "A REPLICA" << endl;
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    // break;
+                }
+            } else {
+                
+                if(node == g_node_id){
+                    node++;
+                }
+                if (node > g_total_node_cnt - 1){
+                    node = g_total_node_cnt - g_client_node_cnt;
+                    continue;
+                }
+                // cout << "SP: " << g_node_id << "A REPLICA" << endl;
+                if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    node++;
+                    continue;
+                } else {
+                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
+                    // memset(signed_req_area[node], 0 , 8);
+                    local_cas(&signed_req_area[node][0], 2, 0);
+                    msgs = Message::create_messages((char *)buf);
+                    bufRDMARECVMTX.unlock();
+                    INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+                    INC_STATS(thd_id, msg_recv_cnt, 1);
+                    return msgs;
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    // break;
+                }
+            }
+        }
+    } 
+    else {
+        while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+            if(node == g_node_id){
+                node++;
+            }
+            if (node > g_total_node_cnt - 2){
+                node = 0;
+                continue;
+            }
+            // cout << "SP: " << g_node_id << "A CLIENT" << endl;
+            if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                // cout << (int)signed_req_area[node][0] << endl;
+                node++;
+                continue;
+            } else {
+                memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
+                // memset(signed_req_area[node], 0 , 8);
+                local_cas(&signed_req_area[node][0], 2, 0);
+                msgs = Message::create_messages((char *)buf);
+                bufRDMARECVMTX.unlock();
+                INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+                INC_STATS(thd_id, msg_recv_cnt, 1);
+                return msgs;
+                // cout << (int)signed_req_area[node][0] << endl;
+                // break;
+            }
+        }
     }
-    msgs = Message::create_messages((char *)buf);
+    
+    // free(buf);
+    // INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+    // INC_STATS(thd_id, msg_recv_cnt, 1);
+    // return msgs;
     return msgs;
 }
 #else
@@ -455,6 +504,9 @@ std::vector<Message *> *Transport::recv_msg(uint64_t thd_id)
     void *buf;
     std::vector<Message *> *msgs = NULL;
 
+    // cout << "SP --> RECV: TCP" << endl;
+    fflush(stdout);
+    
     uint64_t ctr, start_ctr;
     uint64_t starttime = get_sys_clock();
     if (!ISSERVER)

@@ -1,0 +1,92 @@
+if(g_node_id < g_node_cnt){
+        if(thd_id % g_rem_thread_cnt == 0){
+            //thread to read from memory reserved for replicas
+            cout << "SP --> thd_id: " << thd_id << " Replica mems" << endl;
+            fflush(stdout);
+            uint32_t node = g_node_id + 1;
+            char *buf = (char *)malloc(MSG_SIZES);
+            memset(buf, 0, MSG_SIZES);
+            while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+                if(node == g_node_id){
+                    node++;
+                }
+                if (node > g_node_cnt - 1){
+                    node = 0;
+                    continue;
+                }
+                bufRDMARECVMTX.lock();
+                if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    node++;
+                    bufRDMARECVMTX.unlock();
+                    continue;
+                } else {
+                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES - 8);
+                    memset((signed_req_area[node] + 8), 0 , MSG_SIZES - 8);
+                    local_cas(&signed_req_area[node][0], 2, 0);
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    msgs = Message::create_messages((char *)buf);
+                    bufRDMARECVMTX.unlock();
+                }
+            }
+        } 
+        else{
+            //thread to read from memory reserved for clients
+            uint32_t node = g_node_cnt;
+            cout << "SP --> thd_id: " << thd_id << " Client mems" << endl;
+            fflush(stdout);
+            char *buf = (char *)malloc(MSG_SIZES);
+            memset(buf, 0, MSG_SIZES);
+            while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+                if(node == g_node_id){
+                    node++;
+                }
+                if (node > g_total_node_cnt - 1){
+                    node = g_node_cnt;
+                    continue;
+                }
+                // bufRDMARECVMTX.lock();
+                if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    node++;
+                    // bufRDMARECVMTX.unlock();
+                    continue;
+                } else {
+                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES - 8);
+                    memset((signed_req_area[node] + 8), 0 , MSG_SIZES - 8);
+                    local_cas(&signed_req_area[node][0], 2, 0);
+                    msgs = Message::create_messages((char *)buf);
+                    // cout << (int)signed_req_area[node][0] << endl;
+                    // bufRDMARECVMTX.unlock();
+                }
+            }
+            msgs = Message::create_messages((char *)buf);
+        }
+    }
+    else{
+        uint32_t node = 0;
+        char *buf = (char *)malloc(MSG_SIZES);
+        memset(buf, 0, MSG_SIZES);
+        while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+            if(node == g_node_id){
+                node++;
+            }
+            if (node > g_node_cnt - 1){
+                node = 0;
+                continue;
+            }
+            if(!local_cas(&signed_req_area[node][0], 1, 2)){
+                // cout << (int)signed_req_area[node][0] << endl;
+                node++;
+                continue;
+            } else {
+                memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES - 8);
+                memset((signed_req_area[node] + 8), 0 , MSG_SIZES - 8);
+                local_cas(&signed_req_area[node][0], 2, 0);
+                msgs = Message::create_messages((char *)buf);
+                // cout << (int)signed_req_area[node][0] << endl;
+            }
+        }
+        msgs = Message::create_messages((char *)buf);
+    }
+    return msgs;

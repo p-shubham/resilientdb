@@ -16,7 +16,7 @@
 *CLIENT_SEND_THREAD_CNT:Total Output thread at CLIENT
 */
 #define CLIENT_THREAD_CNT 2 
-#define CLIENT_REM_THREAD_CNT 1 
+#define CLIENT_REM_THREAD_CNT 1
 #define CLIENT_SEND_THREAD_CNT 1 
 #define CLIENT_RUNTIME false  
 #define LOAD_PER_SERVER 1 
@@ -35,7 +35,7 @@
 #define TIME_PROF_ENABLE false 
 #define FIN_BY_TIME true 
 // Number of transactions each client should send without waiting. 
-#define MAX_TXN_IN_FLIGHT 20000 
+#define MAX_TXN_IN_FLIGHT 20000
 #define SERVER_GENERATE_QUERIES false  
 #define MEM_ALLIGN 8 
 #define THREAD_ALLOC false 
@@ -171,7 +171,7 @@
 // Number of threads to create batches at primary replica.  
 #define BATCH_THREADS 2 
 // Size of each batch. 
-#define BATCH_SIZE 100
+#define BATCH_SIZE 1000
 #define BATCH_ENABLE BSET 
 #define BSET 1 
 #define BUNSET 0 
