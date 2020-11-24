@@ -165,7 +165,7 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
 
 #if RDMA
 void Transport::init(){
-
+    cout << "IN TRANSPORT" << endl;
     rread_ifconfig("./ifconfig.txt"); // TODO: Why?
 	init_ctx();
 	CPE(!ctx, "Init ctx failed", 0);

@@ -166,8 +166,7 @@ void create_qp(struct context *ctx)
         init_attr.cap.max_recv_wr = 1,
         init_attr.cap.max_send_sge = 1,
         init_attr.cap.max_recv_sge = 1,
-
-        // init_attr.cap.max_inline_data = 800; //Check this number
+        init_attr.cap.max_inline_data = 800; //Check this number
         // init_attr.qp_type = IBV_QPT_UC; // IBV_QPT_UC
         ctx->qp[i] = ibv_create_qp(ctx->pd, &init_attr);
         CPE(!ctx->qp[i], "Couldn't create connected QP", 0);
