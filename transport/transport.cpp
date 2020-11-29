@@ -165,7 +165,6 @@ Socket *Transport::connect(uint64_t dest_id, uint64_t port_id)
 
 #if RDMA
 void Transport::init(){
-    cout << "IN TRANSPORT" << endl;
     rread_ifconfig("./ifconfig.txt"); // TODO: Why?
 	init_ctx();
 	CPE(!ctx, "Init ctx failed", 0);
@@ -312,68 +311,68 @@ std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
     memset(buf, 0, MSG_SIZES);
     // cout << "SP --> RECV: RDMA" << endl;
     // fflush(stdout);
-    if(ISSERVER) {
-        while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
-            if(thd_id % g_rem_thread_cnt == 1){
-                if(node == g_node_id){
-                    node++;
-                }
-                if (node > g_total_node_cnt - 2){
-                    node = 0;
-                    continue;
-                }
-                if(!local_cas(&signed_req_area[node][0], 1, 2)){
-                    // cout << "SP: " << (int)signed_req_area[node][0] << endl;
-                    node++;
-                    continue;
-                } else {
-                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
-                    // memset(signed_req_area[node], 0 , 8);
-                    local_cas(&signed_req_area[node][0], 2, 0);
-                    msgs = Message::create_messages((char *)buf);
-                    bufRDMARECVMTX.unlock();
-                    INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
-                    INC_STATS(thd_id, msg_recv_cnt, 1);
-                    return msgs;
-                    // cout << "SP: " << g_node_id << "A REPLICA" << endl;
-                    // cout << (int)signed_req_area[node][0] << endl;
-                    // break;
-                }
-            } else {
+    // if(ISSERVER) {
+    //     while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
+    //         if(thd_id % g_rem_thread_cnt == 1){
+    //             if(node == g_node_id){
+    //                 node++;
+    //             }
+    //             if (node > g_total_node_cnt - 2){
+    //                 node = 0;
+    //                 continue;
+    //             }
+    //             if(!local_cas(&signed_req_area[node][0], 1, 2)){
+    //                 // cout << "SP: " << (int)signed_req_area[node][0] << endl;
+    //                 node++;
+    //                 continue;
+    //             } else {
+    //                 memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
+    //                 // memset(signed_req_area[node], 0 , 8);
+    //                 local_cas(&signed_req_area[node][0], 2, 0);
+    //                 msgs = Message::create_messages((char *)buf);
+    //                 bufRDMARECVMTX.unlock();
+    //                 INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+    //                 INC_STATS(thd_id, msg_recv_cnt, 1);
+    //                 return msgs;
+    //                 // cout << "SP: " << g_node_id << "A REPLICA" << endl;
+    //                 // cout << (int)signed_req_area[node][0] << endl;
+    //                 // break;
+    //             }
+    //         } else {
                 
-                if(node == g_node_id){
-                    node++;
-                }
-                if (node > g_total_node_cnt - 1){
-                    node = g_total_node_cnt - g_client_node_cnt;
-                    continue;
-                }
-                // cout << "SP: " << g_node_id << "A REPLICA" << endl;
-                if(!local_cas(&signed_req_area[node][0], 1, 2)){
-                    // cout << (int)signed_req_area[node][0] << endl;
-                    node++;
-                    continue;
-                } else {
-                    memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
-                    // memset(signed_req_area[node], 0 , 8);
-                    local_cas(&signed_req_area[node][0], 2, 0);
-                    msgs = Message::create_messages((char *)buf);
-                    bufRDMARECVMTX.unlock();
-                    INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
-                    INC_STATS(thd_id, msg_recv_cnt, 1);
-                    return msgs;
-                    // cout << (int)signed_req_area[node][0] << endl;
-                    // break;
-                }
-            }
-        }
-    } 
-    else {
+    //             if(node == g_node_id){
+    //                 node++;
+    //             }
+    //             if (node > g_total_node_cnt - 1){
+    //                 node = g_total_node_cnt - g_client_node_cnt;
+    //                 continue;
+    //             }
+    //             // cout << "SP: " << g_node_id << "A REPLICA" << endl;
+    //             if(!local_cas(&signed_req_area[node][0], 1, 2)){
+    //                 // cout << (int)signed_req_area[node][0] << endl;
+    //                 node++;
+    //                 continue;
+    //             } else {
+    //                 memcpy(buf, (signed_req_area[node] + 8), MSG_SIZES);
+    //                 // memset(signed_req_area[node], 0 , 8);
+    //                 local_cas(&signed_req_area[node][0], 2, 0);
+    //                 msgs = Message::create_messages((char *)buf);
+    //                 bufRDMARECVMTX.unlock();
+    //                 INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
+    //                 INC_STATS(thd_id, msg_recv_cnt, 1);
+    //                 return msgs;
+    //                 // cout << (int)signed_req_area[node][0] << endl;
+    //                 // break;
+    //             }
+    //         }
+    //     }
+    // } 
+    // else {
         while(msgs == NULL and (!simulation->is_setup_done() || (simulation->is_setup_done() && !simulation->is_done()))){
             if(node == g_node_id){
                 node++;
             }
-            if (node > g_total_node_cnt - 2){
+            if (node > g_total_node_cnt - 1){
                 node = 0;
                 continue;
             }
@@ -390,12 +389,12 @@ std::vector<Message *> * Transport::recv_msg(uint64_t thd_id){
                 bufRDMARECVMTX.unlock();
                 INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);
                 INC_STATS(thd_id, msg_recv_cnt, 1);
-                return msgs;
+                // return msgs;
                 // cout << (int)signed_req_area[node][0] << endl;
-                // break;
+                break;
             }
         }
-    }
+    // }
     
     // free(buf);
     // INC_STATS(thd_id, msg_recv_time, get_sys_clock() - starttime);

@@ -4,7 +4,7 @@ import threading
 def executor(host, id):
     command = 'bash cloudlab_config.sh ' + host + ' ' + str(id)
     subprocess.call(command, shell=True)
-        
+    
 class myThread (threading.Thread):
     def __init__(self, host, id):
         threading.Thread.__init__(self)
@@ -22,5 +22,3 @@ for thread in all_threads:
     thread.start()
 for thread in all_threads:
     thread.join()
-
-

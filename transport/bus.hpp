@@ -61,7 +61,7 @@ void recv_thread(int id, struct context *ctx)
         {
             count++;
             counter.insert(i);
-            // cout << "Recieved from " << i << endl;
+            cout << "Recieved from " << i << endl;
         }
         i++;
         if (counter.size() == g_total_node_cnt - 1)
@@ -69,7 +69,7 @@ void recv_thread(int id, struct context *ctx)
             break;
         }
     }
-    // cout << "Rec: res_area_stags" << endl;
+    cout << "Rec: res_area_stags" << endl;
     count = 0;
     i = 0;
     counter.clear();
@@ -91,7 +91,7 @@ void recv_thread(int id, struct context *ctx)
         {
             count++;
             counter.insert(i);
-            // cout << "Recieved from " << i << endl;
+            cout << "Recieved from " << i << endl;
         }
         i++;
         if (counter.size() == g_total_node_cnt - 1)
@@ -120,7 +120,7 @@ void recv_thread(int id, struct context *ctx)
         {
             count++;
             counter.insert(i);
-            // cout << "Recieved from " << i << endl;
+            cout << "Recieved from " << i << endl;
         }
         i++;
         if (counter.size() == g_total_node_cnt - 1)
@@ -128,7 +128,7 @@ void recv_thread(int id, struct context *ctx)
             break;
         }
     }
-    // cout << "Rec: req_area_stags" << endl;
+    cout << "Rec: req_area_stags" << endl;
     count = 0;
     i = 0;
     counter.clear();
@@ -161,7 +161,7 @@ void recv_thread(int id, struct context *ctx)
             break;
         }
     }
-    // cout << "Recvd QPs" << endl;
+    cout << "Recvd QPs" << endl;
 }
 
 void send_thread(int id, struct context *ctx)
@@ -190,7 +190,7 @@ void send_thread(int id, struct context *ctx)
         else*/
         if (s > 0)
         {
-            // cout << "Sent to " << i << endl;
+            cout << "Sent to " << i << endl;
             counter.insert(i);
             count++;
         }
@@ -201,7 +201,7 @@ void send_thread(int id, struct context *ctx)
             break;
         }
     }
-    // cout << "Resp area sent" << endl;
+    cout << "Client area sent" << endl;
     count = 0;
     i = 0;
     counter.clear();
@@ -221,7 +221,7 @@ void send_thread(int id, struct context *ctx)
         int s = nn_send(sock, &signed_req_stag[id], sizeof(struct stag), 1);
         if (s > 1)
         {
-            // cout << "Sent to" << i << endl;
+            cout << "Sent to" << i << endl;
             counter.insert(i);
             count++;
         }
@@ -231,6 +231,7 @@ void send_thread(int id, struct context *ctx)
             break;
         }
     }
+    cout << "Signed area sent" << endl;
     count = 0;
     i = 0;
     counter.clear();
@@ -250,7 +251,7 @@ void send_thread(int id, struct context *ctx)
         int s = nn_send(sock, &replica_mem_stag[id], sizeof(struct stag), 1);
         if (s > 1)
         {
-            // cout << "Sent to" << i << endl;
+            cout << "Sent to" << i << endl;
             counter.insert(i);
             count++;
         }
@@ -260,6 +261,7 @@ void send_thread(int id, struct context *ctx)
             break;
         }
     }
+    cout << "Replica area sent" << endl;
     count = 0;
     i = 0;
     counter.clear();
@@ -288,7 +290,7 @@ void send_thread(int id, struct context *ctx)
             break;
         }
     }
-    // cout << "QPs Sent" << endl;
+    cout << "QPs Sent" << endl;
     // cout << "Done Send" << endl;
 }
 
@@ -305,7 +307,7 @@ int node(int node_id)
     signed_req_stag[id].size = MSG_SIZES;
     signed_req_stag[id].id = id;
 
-    for(int i = 0; i< CLIENT_REQ_NUM ; i++){
+    for(int i = 0; i< g_total_node_cnt ; i++){
         client_req_stag[id].rkey[i] = client_req_mr[i]->rkey;
         client_req_stag[id].buf[i] = (uintptr_t) client_req_[i];
     }

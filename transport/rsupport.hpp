@@ -25,7 +25,7 @@ using namespace std;
 #define TX_DEPTH 2048
 #define PRIMARY_IB_PORT 1
 #define KB 1024
-#define MSG_SIZES MSG_SIZE_MAX * 2 //520204 Bytes
+#define MSG_SIZES MSG_SIZE_MAX / 2//520204 Bytes
 #define CLIENT_REQ_NUM 5
 
 #define CPE(val, msg, err_code)                    \
@@ -42,7 +42,7 @@ std::mutex accmtx;
 char **client_req_, **signed_req_area, **replica_mem_area, **exec_mem_area, *local_area, *cas_area, *read_area;
 
 //Registered memory
-struct ibv_mr **client_req_mr, **signed_req_mr, **replica_mem_mr, **exec_mem_mr, *local_area_mr, *cas_area_mr, *read_area_mr;
+struct ibv_mr *local_area_mr, *cas_area_mr, *read_area_mr, **signed_req_mr, **replica_mem_mr, **exec_mem_mr, **client_req_mr;
 
 //Following are the functions to support RDMA operations:
 union ibv_gid get_gid(struct ibv_context *context);
@@ -135,6 +135,7 @@ static struct context *init_ctx()
     ctx->pd = ibv_alloc_pd(ctx->context);
     CPE(!ctx->pd, "Couldn't allocate PD", 0);
     ctx->num_conns = g_total_node_cnt;
+    ctx->sock_port = 1;
     create_qp(ctx);
     qp_to_init(ctx);
 
@@ -158,15 +159,16 @@ void create_qp(struct context *ctx)
         // CPE(!ctx->cq[i], "Couldn't create SCQ", 0);
 
         struct ibv_qp_init_attr init_attr;
+        memset(&init_attr, 0, sizeof(init_attr));
         init_attr.qp_type = IBV_QPT_RC;
         init_attr.sq_sig_all = 1;
         init_attr.send_cq = ctx->cq[i],
         init_attr.recv_cq = ctx->cq[i],
-        init_attr.cap.max_send_wr = 1,
-        init_attr.cap.max_recv_wr = 1,
+        init_attr.cap.max_send_wr = 2,
+        init_attr.cap.max_recv_wr = 2,
         init_attr.cap.max_send_sge = 1,
         init_attr.cap.max_recv_sge = 1,
-        init_attr.cap.max_inline_data = 800; //Check this number
+        // init_attr.cap.max_inline_data = 800; //Check this number
         // init_attr.qp_type = IBV_QPT_UC; // IBV_QPT_UC
         ctx->qp[i] = ibv_create_qp(ctx->pd, &init_attr);
         CPE(!ctx->qp[i], "Couldn't create connected QP", 0);
@@ -350,19 +352,19 @@ static int poll_cq(struct ibv_cq *cq, int num_completions)
 
 /*For Multiple Memory Registration*/
 
-int setup_client_buffer(){
-    int FLAGS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | 
-			IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
-    client_req_ = (char **) malloc(CLIENT_REQ_NUM*sizeof(char *)); // TODO: indexSize
-    client_req_mr = (struct ibv_mr **) malloc(CLIENT_REQ_NUM*sizeof(struct ibv_mr *));
-    for(int i = 0; i < CLIENT_REQ_NUM;i++){
-        // cout << "DEBUG MEM: CLIENT" << i << endl;
-        client_req_[i] = (char *) malloc(MSG_SIZES);
-        client_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) client_req_[i], MSG_SIZES, FLAGS);
-        memset(client_req_[i], 0, MSG_SIZES);
-    }
-    return 0;
-}
+// int setup_client_buffer(){
+//     int FLAGS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | 
+// 			IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
+//     client_req_ = (char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: indexSize
+//     client_req_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
+//     for(int i = 0; i < CLIENT_REQ_NUM;i++){
+//         cout << "DEBUG MEM: CLIENT" << i << endl;
+//         client_req_[i] = (char *) memalign(512, MSG_SIZES);
+//         client_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) client_req_[i], MSG_SIZES, FLAGS);
+//         memset(client_req_[i], 0, MSG_SIZES);
+//     }
+//     return 0;
+// }
 
 int setup_buffers(){ // TODO: ctx is global variable
     int FLAGS = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | 
@@ -372,7 +374,7 @@ int setup_buffers(){ // TODO: ctx is global variable
     signed_req_area = ( char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: indexSize / Brainstorm application of lock free Queues
     signed_req_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
     for(int i = 0; i < g_total_node_cnt;i++){ 
-        // cout << "DEBUG MEM: SIGNED" << i << endl;
+        cout << "DEBUG MEM: SIGNED" << i << endl;
         signed_req_area[i] = (char *) memalign(512, MSG_SIZES);
         signed_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) signed_req_area[i], MSG_SIZES, FLAGS);
         memset(signed_req_area[i], 0 , MSG_SIZES);
@@ -382,7 +384,7 @@ int setup_buffers(){ // TODO: ctx is global variable
     replica_mem_area = (char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: should be g_rem_thread_cnt
     replica_mem_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
     for(int i = 0; i < g_total_node_cnt;i++){
-        // cout << "DEBUG MEM: REPLICA" << i << endl;
+        cout << "DEBUG MEM: REPLICA" << i << endl;
         replica_mem_area[i] = (char *) memalign(512, MSG_SIZES);
         replica_mem_mr[i] = ibv_reg_mr(ctx->pd, (char *) replica_mem_area[i], MSG_SIZES, FLAGS);
         memset(replica_mem_area[i], 0 , MSG_SIZES);
@@ -390,11 +392,20 @@ int setup_buffers(){ // TODO: ctx is global variable
 
     exec_mem_area = (char **) malloc(g_total_node_cnt*g_total_node_cnt*sizeof(char *)); //TODO: remove this
     exec_mem_mr = (struct ibv_mr **) malloc(g_total_node_cnt*g_total_node_cnt*sizeof(struct ibv_mr *));
-    for(int i = 0; i < g_total_node_cnt * g_total_node_cnt;i++){
-        // cout << "DEBUG MEM: EXEC" << i << endl;
+    for(int i = 0; i < g_total_node_cnt;i++){
+        cout << "DEBUG MEM: EXEC" << i << endl;
         exec_mem_area[i] = (char *) memalign(512, MSG_SIZES);
         exec_mem_mr[i] = ibv_reg_mr(ctx->pd, (char *) exec_mem_area[i], MSG_SIZES, FLAGS);
         memset(exec_mem_area[i], 0 , MSG_SIZES);
+    }
+
+    client_req_ = (char **) malloc(g_total_node_cnt*sizeof(char *)); // TODO: indexSize
+    client_req_mr = (struct ibv_mr **) malloc(g_total_node_cnt*sizeof(struct ibv_mr *));
+    for(int i = 0; i < g_total_node_cnt;i++){
+        cout << "DEBUG MEM: CLIENT" << i << endl;
+        client_req_[i] = (char *) memalign(512, MSG_SIZES);
+        client_req_mr[i] = ibv_reg_mr(ctx->pd, (char *) client_req_[i], MSG_SIZES, FLAGS);
+        memset(client_req_[i], 0, MSG_SIZES);
     }
 
     local_area = (char *) memalign(512, MSG_SIZES); // TODO: message size should be MAX_MSG_SIZE
@@ -409,7 +420,7 @@ int setup_buffers(){ // TODO: ctx is global variable
     read_area_mr = ibv_reg_mr(ctx->pd, (char *) read_area, MSG_SIZES / 2, FLAGS);
     memset(read_area, 0, MSG_SIZES);
 
-    setup_client_buffer();
+    // setup_client_buffer();
     return 0;
 }
 
